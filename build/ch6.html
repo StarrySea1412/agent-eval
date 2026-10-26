@@ -1,0 +1,93 @@
+<section class="chapter" id="ch6">
+  <div class="ch-head">
+    <div class="ch-num">SECTION<b>06</b></div>
+    <div class="ch-title">
+      <h2>回归与门禁</h2>
+      <p>3587 个测试全绿，不等于可以发。测试证明机器没坏，不证明它答得对。</p>
+    </div>
+  </div>
+  <div class="ch-body">
+    <p class="lede">评测的终点不是一份报告，是一个决定：这一版能不能发。SeeFlow 把决定拆成四道门，每道门回答不同的问题。它们不能互相替代，也不该互相打折。</p>
+
+    <h3>第一道门：合同测试（3587 个）</h3>
+    <p>仓库现在有 144 个测试文件、3587 个用例（另有 19 个子测试），本机跑完 242 秒。它们覆盖的东西非常具体：时间戳贴回、bigram 命中率、引文词边界、OCR 交叉、覆盖账本、缓存键、路径穿越、并发锁、降级报告、评测计算。全部通过。</p>
+    <p>这些测试证明的是<strong>合同</strong>：给定这些输入，系统一定做出这些判断。它们不证明内容质量——测试里的「模型」是模拟的，断言的也是管线行为。把合同测试当成质量证明，是工程团队最常见的自我安慰：绿色对勾让人安心，但它只说明机器没坏。</p>
+    <div class="code">
+      <div class="code-bar"><b>3587 个用例的分工</b><span>大致比例</span></div>
+<pre><span class="c"># 真正会调用模型的：不到一成</span>
+<span class="c"># 其余都在测「缝隙」：</span>
+时间戳能不能贴回 · 引文边界对不对 · 覆盖账本记不记
+缓存键换条件会不会失效 · 路径会不会穿越 · 并发会不会串账
+降级报告有没有交底 · 评测计算的分母对不对</pre>
+    </div>
+
+    <h3>第二道门：金标准回归</h3>
+    <p>19 条金标准 + 4 条视觉点，每次改动提示词、模型、分块策略后重跑。它回答「内容覆盖有没有退步」。但这道门有一个现实限制：样本太小（第 3 章），所以它只能设一个很粗的闸——比如「命中数不得低于 3/19」——不能设「必须达到 15/19」。设太细的门，只会让团队学会调参过拟合这 19 条。</p>
+    <p>更合理的用法是<strong>方向性回归</strong>：改动前后各跑 3 次，比较均值与区间；如果区间大幅重叠，就不宣称提升。这把「有没有变好」从「分数涨了没有」变成了「差异是否超过噪声」。</p>
+
+    <h3>第二点五道门：问答合同（40 个用例）</h3>
+    <p>摘要之外还有一条产品线：「问这个视频」。它的评测目标不是「答得像」，而是「引用得住」：每个回答必须带引用 ID，引用必须来自当轮注入的来源，回填的原话必须与索引原文逐字一致。40 个标注问题里 28 个有答案、12 个无答案（无答案必须拒答或标 insufficient），其中包含跨视频题与「答案只在长视频后半段」的题。</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>硬指标</th><th>结果</th><th>含义</th></tr></thead>
+        <tbody>
+          <tr><td>引用 ID 匹配</td><td class="num">100%</td><td>entry.citations ⊆ 当轮注入来源</td></tr>
+          <tr><td>回填原话逐字一致</td><td class="num">100%</td><td>quote == docs.raw</td></tr>
+          <tr><td>编造引用被丢弃</td><td class="num">2 / 2</td><td>不存在的 ID 全部被丢并记录</td></tr>
+          <tr><td>无答案拒答率</td><td class="num">100%</td><td>12 个无答案问题全部拒答/标不足</td></tr>
+          <tr><td>跨视频双来源</td><td class="num">10 / 10</td><td>两个视频各引一条</td></tr>
+          <tr><td>后半段引用</td><td class="num">5 / 5</td><td>3600s 视频的后半段没被截断</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>这组数字同样来自模拟模型，文件开头写着 <code>simulated-model（系统合同验证；真实模型的引用支持率/拒答率待 Gate 复测）</code>。它证明的是合同：引用解析、逐字回填、拒答路径、长视频后半段检索、历史持久化（40 轮重开可读）。它不证明真实模型会老实引用——那是下一层的事。</p>
+
+    <h3>第三道门：质量门（体检，不是裁判）</h3>
+    <p>报告级质量门输出诊断：要点与邻近字幕高度重复（<code>transcript_like</code>）、画面判断没有证据帧（<code>visual_without_evidence</code>）、要点集中在片头（<code>uncovered_tail</code>）、覆盖不完整（<code>coverage_incomplete</code>）、支持率偏低（<code>weak_source_support</code>）。状态只有 pass / review / fail；除结构性错误外，它从不删除内容。</p>
+    <p>它在门禁里的角色是<strong>黄灯</strong>，不是红灯：review 不阻止生成，但阻止「把这份报告当作已验证的样本发出去」。这也是它和测试的区别——测试回答「代码对不对」，质量门回答「这份产物像不像话」。</p>
+
+    <h3>第四道门：人工复核</h3>
+    <p>模型/渠道要升级到「金标准候选」，需要同时满足：T1 体检 <code>report_ok</code>（JSON 成功率 ≥2/3 且 tokens_in_60s ≥2500）、人工九项清单全部 passed、引用对齐率 ≥0.8。九项清单是固定的：工程机与温度、CPU 功耗口径、CPU 数字配对、CPU 等性能对照、GPU 峰值与等性能、GPU 低功耗条件、游戏与窗口、AI 名称与单位、量产待验证。</p>
+    <p>注意这套门禁的对象：它管的是「这个渠道/模型能不能被选为默认」，不是「这一篇报告能不能发」。两个决定的风险不同，门的严格程度也不同。把两者混在一起，会导致要么模型永远上不了线，要么报告未经复核就流出。</p>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>发布对象</th><th>必须过的门</th><th>典型判定</th></tr></thead>
+        <tbody>
+          <tr><td><b>代码改动</b></td><td>合同测试 + 关键路径回归</td><td>3587 全绿才允许合并</td></tr>
+          <tr><td><b>默认模型/渠道</b></td><td>T1 体检 + 九项人工 + 引用对齐</td><td>四者齐全才是 <code>gold_candidate</code></td></tr>
+          <tr><td><b>一份具体报告</b></td><td>质量门 + 抽检</td><td>review 状态可以发，但必须带「待核实」标记</td></tr>
+          <tr><td><b>评测结论</b></td><td>固定条件 + 多次运行 + 区间</td><td>单次、无区间、换过条件的，不进结论</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <figure class="fig">
+      <div class="frame"><img src="assets/art/gate.webp" alt="纸鹤站在昏暗大厅里，面前四道闸机分别亮着绿、绿、黄、红的指示灯，旁边一叠空白卡片" width="1280" height="768"/></div>
+      <figcaption><b>FIG. 04</b>四道门：任何一道单独亮绿灯，都不足以放行。</figcaption>
+    </figure>
+
+    <p>下面这枚小样把四道门做成开关。你会发现：合同测试全绿、金标准 15/19，只要人工复核没做，最终状态仍然不是「可发」；反过来，人工说好、质量门却是 fail，也不能发。门禁的意义就在于<strong>没有任何一道门可以单独放行</strong>。</p>
+  </div>
+
+  <div class="demo" id="demo-gate">
+    <div class="demo-head">
+      <span class="demo-tag">DEMO 04</span>
+      <span class="demo-title">发布门禁 <span class="hint">四道门，缺一不可</span></span>
+    </div>
+    <div class="demo-body">
+      <div class="gates" id="gates">
+        <div class="gate pass" data-g="contract"><span class="no">01</span><span class="lbl"><b>合同测试</b><small>3587 个用例 / 0 失败</small></span><span class="st">PASS</span></div>
+        <div class="gate pass" data-g="golden"><span class="no">02</span><span class="lbl"><b>金标准回归</b><small>19 条要点 + 4 条视觉点，3 次运行</small></span><span class="st">PASS</span></div>
+        <div class="gate pass" data-g="quality"><span class="no">03</span><span class="lbl"><b>质量门</b><small>0 error / 4 warning / review</small></span><span class="st">PASS</span></div>
+        <div class="gate fail" data-g="human"><span class="no">04</span><span class="lbl"><b>人工复核</b><small>九项清单 + 引用对齐率</small></span><span class="st">FAIL</span></div>
+      </div>
+      <div class="gate-verdict">
+        <span class="v block" id="gate-v">BLOCK</span>
+        <span class="why" id="gate-why">人工复核未完成：金标准与质量门通过，只能说明「机器没坏、产物像话」，不能替代人对内容的判断。</span>
+      </div>
+      <p class="hintline" style="margin-top:10px">点任意一门切换 PASS / FAIL，看最终 verdict 如何变化。规则：四门全 PASS 才 SHIP；任何一门 FAIL 即 BLOCK；质量门 review 视为 PASS-with-warning，不单独放行。</p>
+    </div>
+    <div class="demo-foot"><b>模型</b> 门禁规则取自 SeeFlow 的测试、评测与成绩单实现（<code>report_ok</code> / 九项清单 / 引用对齐 ≥0.8）；示意状态是四种典型组合，不是实时数据。</div>
+  </div>
+</section>

@@ -1,0 +1,105 @@
+<section class="chapter" id="ch3">
+  <div class="ch-head">
+    <div class="ch-num">SECTION<b>03</b></div>
+    <div class="ch-title">
+      <h2>金标准与置信区间</h2>
+      <p>19 条金标准能告诉你「大概在哪个区间」，不能告诉你「比上周高了 3 个百分点」。</p>
+    </div>
+  </div>
+  <div class="ch-body">
+    <p class="lede">SeeFlow 的唯一真实金标准用例，是那条 18 分钟的影视飓风颁奖片。做法很笨：一个人把原始 whisper 字幕从头读到尾，独立标出 19 条要点；再把「只有看画面才能写对」的 4 条单独标成视觉点。标注时不参考任何管线输出，ASR 的错字（「影视剧风」「加能」「CLOCK 3」）在金标准里改正——因为金标准考的是内容，不是谁的转写更准。</p>
+    <p>这份标注有三个刻意的设计，值得逐条说：</p>
+    <ul>
+      <li><strong>独立标注。</strong>金标准不能由被测系统参与生成，否则就是自证。标注者只拿原始字幕和视频，不看报告。</li>
+      <li><strong>改写正确写法。</strong>「加能」改「佳能」，「CLOCK 3」改「C-Log 3」。这会让「照抄转写」的系统得低分，让「理解后改写」的系统得高分——是故意的。</li>
+      <li><strong>视觉点单列。</strong>4 条视觉点不混进 19 条总分，单独构成「视觉增益」的分母。否则视觉能力会被字幕能力稀释（详见第 4 章）。</li>
+    </ul>
+
+    <figure class="fig">
+      <div class="frame"><img src="assets/art/golden-ruler.webp" alt="纸鹤用钢针在一根金色长尺上刻细密的刻度，旁边放着水平仪、砝码和放大镜" width="1280" height="768"/></div>
+      <figcaption><b>FIG. 02</b>金标准是一把刻出来的尺子：刻度越细，越贵，也越容易被磨掉。</figcaption>
+    </figure>
+
+    <h3>19 条能说明什么：一个区间，不是一个点</h3>
+    <p>3/19 = 15.8%。这个数字本身没有意义，除非你把它放进抽样误差里。对于二项分布的小样本，常用的 95% 置信区间是 Wilson 区间：</p>
+    <div class="formula">
+      <div class="eq">CI = ( p + z²/2n ± z·√(p(1−p)/n + z²/4n²) ) / (1 + z²/n)</div>
+      <small>p = k/n，z = 1.96（95%）；n 是金标准条数，k 是命中数</small>
+      <p class="why">为什么不用最简单的 p ± 1.96·√(p(1−p)/n)？因为在小样本、极端比例（0 或 1）时它会算出负数或超过 1 的区间。Wilson 区间在 n=19、k=3 时给出 [5.5%, 37.6%]，仍然很宽，但至少不会越界。</p>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>观测</th><th>点估计</th><th>95% Wilson 区间</th><th>这个区间意味着</th></tr></thead>
+        <tbody>
+          <tr><td class="num">3 / 19</td><td>15.8%</td><td class="num">5.5% – 37.6%</td><td>「真实能力」可能在 6% 到 38% 之间</td></tr>
+          <tr><td class="num">5 / 19</td><td>26.3%</td><td class="num">11.8% – 48.8%</td><td>换一个判分器，区间整体右移但仍重叠</td></tr>
+          <tr><td class="num">15 / 19</td><td>78.9%</td><td class="num">56.7% – 91.5%</td><td>看起来很好，但仍可能与 60% 的系统无法区分</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>换句话说：<strong>3/19 和 5/19 的区间大幅重叠，你不能说「换判分器后提升了 10 个百分点」；15/19 和 12/19 也可能重叠，你不能说「这版比上版好」。</strong> 19 条金标准的分辨率，大概只够区分「基本不会」和「基本都会」，不够区分「70 分」和「80 分」。</p>
+    <p>要多少条才够？如果目标是把 95% 区间的半宽压到 ±10 个百分点，在 p≈0.8 时需要约 <strong>62 条</strong>；如果要在 80% 统计功效下区分 70% 与 80% 两个系统，每组需要约 <strong>295 条</strong>。SeeFlow 现在有 19 条，差了整整一个数量级。这不是懒惰，是标注成本：一条 18 分钟视频标 19 条要花几个小时，而 295 条意味着十几条视频、几十个小时的人工——这还没算标注者之间的一致性检验。</p>
+    <div class="note"><b>样本量的诚实写法：</b>「19 条金标准，3 条命中，点估计 15.8%，95% 区间 5.5%–37.6%」。而不是「命中率 15.8%」。前者告诉你「别拿它做精细比较」，后者鼓励你拿它做精细比较。</div>
+
+    <h3>标注者只有一个人</h3>
+    <p>还有一个没解决的问题：这份金标准只有一个标注者，没有算标注者间一致性（inter-annotator agreement）。同一条「最佳外观奖」到底算不算「要点」、参数要不要拆成多条，换一个人可能标出 16 条或 23 条。没有第二个人独立标注，就无法区分「系统漏了」和「标注者的口味不同」。</p>
+    <p>这是当前评测设施的真实缺口，不应该被「19 条金标准」这个说法掩盖。改进方向很清楚：再找一个人独立标同一份，算 Cohen's κ；低于 0.7 就先修标注规范，而不是急着跑模型。但这需要另一个人的时间，不是代码能解决的。</p>
+
+    <p>下面这枚小样把置信区间画出来。拖金标准条数和命中数，看区间怎么变；再切换两个系统，看它们的区间是否重叠——重叠的时候，任何「A 比 B 好」的结论都不成立。</p>
+  </div>
+
+  <div class="demo" id="demo-ci">
+    <div class="demo-head">
+      <span class="demo-tag">DEMO 01</span>
+      <span class="demo-title">置信区间尺 <span class="hint">19 条金标准的分辨率，比你想象的粗</span></span>
+    </div>
+    <div class="demo-body">
+      <div class="controls">
+        <div class="ctl">
+          <label for="ci-n">金标准条数 n <b id="ci-n-v">19</b></label>
+          <input id="ci-n" type="range" min="5" max="200" step="1" value="19"/>
+        </div>
+        <div class="ctl">
+          <label for="ci-k">系统 A 命中 k <b id="ci-k-v">3</b></label>
+          <input id="ci-k" type="range" min="0" max="19" step="1" value="3"/>
+        </div>
+        <div class="ctl">
+          <label for="ci-k2">系统 B 命中 k <b id="ci-k2-v">5</b></label>
+          <input id="ci-k2" type="range" min="0" max="19" step="1" value="5"/>
+        </div>
+        <div class="ctl" style="flex:0 0 auto">
+          <label>预设</label>
+          <div class="seg" id="ci-presets">
+            <button data-p="3,5,19" aria-pressed="true">3 vs 5</button>
+            <button data-p="15,12,19" aria-pressed="false">15 vs 12</button>
+            <button data-p="62,55,62" aria-pressed="false">62 条</button>
+          </div>
+        </div>
+      </div>
+      <div class="ci-wrap">
+        <div>
+          <div class="ci-plot" id="ci-plot">
+            <div class="ci-grid" id="ci-grid"></div>
+            <div class="ci-axis"></div>
+            <div id="ci-rows"></div>
+            <div id="ci-ticks"></div>
+          </div>
+          <div class="big-num" style="margin-top:12px">
+            <div>A 点估计<b id="ci-pa">15.8%</b></div>
+            <div>A 区间<b id="ci-ia">5.5–37.6%</b></div>
+            <div>B 点估计<b id="ci-pb">26.3%</b></div>
+            <div>B 区间<b id="ci-ib">11.8–48.8%</b></div>
+          </div>
+        </div>
+        <div class="ci-side">
+          <div class="row"><span>区间是否重叠</span><b id="ci-overlap">是</b></div>
+          <div class="row"><span>可区分结论</span><b id="ci-conclusion">不成立</b></div>
+          <div class="row"><span>±10% 半宽所需 n</span><b id="ci-need">62</b></div>
+          <div class="ci-verdict" id="ci-verdict">两个区间大幅重叠：这点差异完全可能是抽样噪声，不能宣称 B 更好。</div>
+          <p class="hintline" style="margin-top:10px">区间用 Wilson 95%；「可区分」只表示两个 95% 区间不重叠，是保守近似，不是正式显著性检验。</p>
+        </div>
+      </div>
+    </div>
+    <div class="demo-foot"><b>模型</b> Wilson score interval，z=1.96。±10% 半宽所需 n 按 1.96²·p(1−p)/0.1²，取 p=0.8（62 条）。示意分数取自真实的 3/19、5/19、15/19，不含任何模拟生成。</div>
+  </div>
+</section>

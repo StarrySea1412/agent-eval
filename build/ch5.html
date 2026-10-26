@@ -1,0 +1,88 @@
+<section class="chapter" id="ch5">
+  <div class="ch-head">
+    <div class="ch-num">SECTION<b>05</b></div>
+    <div class="ch-title">
+      <h2>实验纪律</h2>
+      <p>评测的可信度不来自分数，来自「换一个人照这份记录重跑，能不能得到同一结论」。</p>
+    </div>
+  </div>
+  <div class="ch-body">
+    <p class="lede">第 1 章说过，Agent 的运行路径会因为缓存、渠道、模型版本而变。所以一次有效的评测必须先把这些变量钉死，再谈分数。SeeFlow 把这套纪律写成了一个受控重跑脚本：不给它真实视频、不重新转写、不重新下载，只把<strong>已经保存的证据</strong>喂给一个<strong>钉死的渠道</strong>，并且给这次实验设一个硬预算。</p>
+
+    <h3>一次只跑了 8 个请求的实验</h3>
+    <p>那份记录的参数是这样的：</p>
+    <div class="code">
+      <div class="code-bar"><b>eval/results/xiaobai-…/requests.json</b><span>受控重跑</span></div>
+<pre><span class="s">"max_requests"</span>: <span class="n">37</span>, <span class="s">"min_gap_s"</span>: <span class="n">5.0</span>, <span class="s">"max_concurrency"</span>: <span class="n">1</span>,
+<span class="s">"automatic_retries"</span>: <span class="n">12</span>, <span class="s">"json_repair"</span>: <span class="k">false</span>, <span class="s">"failover"</span>: <span class="k">false</span>,
+<span class="s">"retry_scope"</span>: <span class="s">"transport HTTP 5xx/429/timeout only; content failures never retry"</span>,
+<span class="s">"physical_requests"</span>: <span class="n">8</span>, <span class="s">"stopped_reason"</span>: <span class="s">"HTTP 524: error code: 524"</span></pre>
+    </div>
+    <p>它在第 8 个物理请求时被渠道的 524 掐断，状态是 stopped，不是 done。从「质量评测」的角度，这次实验<strong>没有结果</strong>——没跑完，不能算命中率。但从「基础设施评测」的角度，它给出了三个有效结论：</p>
+    <ul>
+      <li>这个渠道在 8 个请求内就会撞上 524 墙，不能用于长报告生成；</li>
+      <li>预算控制生效了：37 次上限、5 秒间隔、并发 1，没有把失败放大成一次烧钱事故；</li>
+      <li>内容失败零重试的纪律生效了：8 次请求、19,829 token、3 次失败，账本逐条记清。</li>
+    </ul>
+    <p><strong>一个失败的实验也是结果，只要失败的原因被记录。</strong>最怕的不是跑挂，是跑挂了却把半截数据当成绩。</p>
+
+    <h3>为什么内容失败绝不重试</h3>
+    <p>这是整套纪律里最反直觉的一条。模型返回了 200，但要点过不了校验——再试一次，可能就过了。为什么不试？</p>
+    <p>因为一旦允许「内容失败重试」，「命中率」就变成了「重试次数」的函数。A 系统每次必错但重试 5 次能蒙对 2 次，B 系统一次就对 3 次——按最终报告算，A 可能赢。更糟的是，不同模型的「重试收益」不一样：有的模型是稳定地错，有的模型是随机地错，重试次数会系统性地偏袒后者。<strong>评测要量的是「一次做对的能力」，不是「反复试错直到对的能力」。</strong></p>
+    <p>所以受控重跑把 <code>json_repair</code> 也关了——连「首轮不是 JSON，原地再修一次」都不允许。传输层的 5xx/429/超时仍然重试（那是网络问题，不是模型问题），但内容层的失败直接丢弃、计入覆盖失败。这条规则让不同模型之间的比较第一次变得有意义。</p>
+
+    <h3>完整性哈希：证明实验没有偷偷改材料</h3>
+    <p>受控重跑在开始前和结束后各算一次受保护文件的 SHA-256：meta、manifest、request、result、debug、timing、timeline、transcript、edits、resources、省流.md、省流.html、思维导图。13 个文件，两次哈希必须完全一致。这不是防外人，是防自己：任何一次「顺手修一下源材料」都会让实验失去可比性。</p>
+    <p>这类检查听起来琐碎，但它是「可复现」的最低成本实现。没有它，你永远不知道两次分数差异是模型变了，还是某次重跑时有人改了输入。</p>
+
+    <h3>单次分数是抽样，不是测量</h3>
+    <p>即使把渠道、缓存、提示词全钉死，模型采样仍然有随机性（SeeFlow 默认 temperature 0.2，不是 0）。同一提示词跑 5 次，可能得到 3 次 15/19、1 次 14/19、1 次 16/19。如果你只报最好那次，分数会系统性偏高；只报最差那次，会系统性偏低。</p>
+    <p>正确做法是<strong>先定运行次数，再报全部结果</strong>：跑 5 次，报均值、标准差和每一次的分数；如果要比较两个系统，用同一运行次数、同一批材料，并报告区间。<strong>「best-of-5」不是评测，是选秀。</strong></p>
+    <div class="formula">
+      <div class="eq">report = (n_runs, mean, sd, all_runs) &nbsp;&nbsp;≠&nbsp;&nbsp; max(runs)</div>
+      <small>n_runs 必须在看到结果之前定好；事后加跑属于 p-hacking</small>
+      <p class="why">如果只跑得起 1 次，就老实写「单次运行，未估计方差」。这比假装稳定要好——至少读者知道该打多少折扣。</p>
+    </div>
+
+    <p>下面的小样模拟「真实能力 80% 的系统」重复跑若干次。你会看到：单次分数可能落在 60% 到 95% 之间；跑 5 次取均值，仍然可能偏离；跑 20 次，均值才稳定下来。那些看起来「突然变好」的版本，很多时候只是抽样运气。</p>
+  </div>
+
+  <div class="demo" id="demo-runs">
+    <div class="demo-head">
+      <span class="demo-tag">DEMO 03</span>
+      <span class="demo-title">重复运行 <span class="hint">同一系统，同一能力，不同的运气</span></span>
+    </div>
+    <div class="demo-body">
+      <div class="controls">
+        <div class="ctl">
+          <label for="runs-p">真实能力 p <b id="runs-p-v">0.80</b></label>
+          <input id="runs-p" type="range" min="0.40" max="0.95" step="0.01" value="0.80"/>
+        </div>
+        <div class="ctl">
+          <label for="runs-n">运行次数 <b id="runs-n-v">12</b></label>
+          <input id="runs-n" type="range" min="1" max="60" step="1" value="12"/>
+        </div>
+        <div class="ctl">
+          <label for="runs-total">每轮断言数 <b id="runs-total-v">19</b></label>
+          <input id="runs-total" type="range" min="19" max="100" step="1" value="19"/>
+        </div>
+        <div class="ctl" style="flex:0 0 auto">
+          <label>种子</label>
+          <div class="seg" id="runs-seed">
+            <button data-s="1" aria-pressed="true">2026</button>
+            <button data-s="2" aria-pressed="false">换一组</button>
+          </div>
+        </div>
+      </div>
+      <div class="runs-plot" id="runs-plot"></div>
+      <div class="runs-stats">
+        <div><b id="runs-mean">80.0%</b><small>均值</small></div>
+        <div><b id="runs-sd">—</b><small>标准差</small></div>
+        <div><b id="runs-min">—</b><small>最低一次</small></div>
+        <div><b id="runs-max">—</b><small>最高一次</small></div>
+      </div>
+      <p class="hintline" id="runs-note" style="margin-top:10px"></p>
+    </div>
+    <div class="demo-foot"><b>模型</b> 每轮 = Binomial(n=每轮断言数, p=真实能力) 的一次抽样，种子固定可复现。它演示的是「抽样波动」，不是真实模型的误差结构（真实模型还会有系统性偏差，那部分重复跑也消不掉）。</div>
+  </div>
+</section>

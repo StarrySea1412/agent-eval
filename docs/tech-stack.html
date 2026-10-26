@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<link rel="preload" href="../assets/fonts/wenkai-regular.woff2" as="font" type="font/woff2" crossorigin/>
+<link rel="preload" href="../assets/fonts/wenkai-medium.woff2" as="font" type="font/woff2" crossorigin/>
+<title>给 Agent 打分 · 技术栈全景图</title>
+<style>
+@font-face{font-family:"LXGW WenKai";src:url("../assets/fonts/wenkai-regular.woff2") format("woff2");font-weight:300 599;font-display:swap}
+@font-face{font-family:"LXGW WenKai";src:url("../assets/fonts/wenkai-medium.woff2") format("woff2");font-weight:600 900;font-display:swap}
+:root{
+  --paper:#f2f3ee;--surface:#fbfcf8;--ink:#1a1d1f;--ink2:#3f4649;--muted:#6b7376;--faint:#8d9597;
+  --line:#d5d9d1;--line2:#e6e9e2;--green:#2f6f57;--green-soft:#e0eee8;--amber:#a9761c;--amber-soft:#f5ead2;
+  --blue:#2f5570;--blue-soft:#e2ebf1;--red:#9c3b2e;--red-soft:#f4e3df;--mono:ui-monospace,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{width:900px;background:var(--paper);color:var(--ink);font-family:"LXGW WenKai",-apple-system,"PingFang SC",sans-serif;padding:44px 46px 38px;-webkit-font-smoothing:antialiased;
+  background-image:linear-gradient(rgba(47,85,112,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(47,85,112,.035) 1px,transparent 1px);background-size:28px 28px}
+.head{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;border-bottom:2px solid var(--ink);padding-bottom:15px}
+.eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.22em;color:var(--red);margin:0 0 9px}
+h1{margin:0;font-size:33px;line-height:1.2;letter-spacing:-.01em;font-weight:800}
+h1 em{font-style:normal;color:var(--green)}
+.head .meta{text-align:right;font-family:var(--mono);font-size:9.5px;line-height:1.95;color:var(--faint);letter-spacing:.06em;white-space:nowrap}
+.dek{margin:16px 0 22px;font-size:13px;line-height:1.85;color:var(--ink2);max-width:750px}
+.legend{display:grid;grid-template-columns:56px 1fr;font-family:var(--mono);font-size:8.5px;letter-spacing:.14em;color:var(--faint);margin-bottom:6px}
+.legend span:nth-child(2){padding-left:15px}
+.layer{display:grid;grid-template-columns:56px 1fr;border-top:1px solid var(--line)}
+.layer:last-of-type{border-bottom:1px solid var(--line)}
+.lname{background:#e9ece4;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:13px 0;border-right:1px solid var(--line)}
+.lname b{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;color:var(--red)}
+.lname span{writing-mode:vertical-rl;font-size:10px;letter-spacing:.24em;color:var(--muted);margin-top:9px}
+.cells{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line2);padding:1px 0 1px 1px}
+.cell{background:var(--surface);padding:11px 12px 10px;min-height:96px;position:relative}
+.cell h3{margin:0 0 3px;font-size:13.5px;font-weight:700;line-height:1.35}
+.cell .en{font-family:var(--mono);font-size:8px;letter-spacing:.1em;color:#9aa1a0;display:block;margin-bottom:6px}
+.cell p{margin:0;font-size:10.5px;line-height:1.72;color:#5d6568}
+.cell.key{background:var(--green-soft)}
+.cell.key h3{color:var(--green)}
+.cell.warn{background:var(--red-soft)}
+.cell.warn h3{color:var(--red)}
+.cell.amber{background:var(--amber-soft)}
+.cell.amber h3{color:var(--amber)}
+.cell .badge{position:absolute;top:8px;right:9px;font-family:var(--mono);font-size:7px;letter-spacing:.08em;color:#9aa1a0}
+.foot{display:grid;grid-template-columns:1.35fr 1fr;gap:26px;margin-top:22px;border-top:2px solid var(--ink);padding-top:14px}
+.foot h4{margin:0 0 7px;font-family:var(--mono);font-size:8.5px;letter-spacing:.2em;color:var(--red);font-weight:700}
+.foot p{margin:0 0 7px;font-size:10.5px;line-height:1.8;color:#5d6568}
+.eq{font-family:var(--mono);font-size:9.5px;color:#4a5255;line-height:2.05}
+.eq b{color:var(--red);font-weight:600}
+.eq i{color:var(--green);font-style:normal}
+.stamp{display:flex;justify-content:space-between;align-items:center;margin-top:16px;font-family:var(--mono);font-size:8.5px;letter-spacing:.14em;color:#9aa1a0}
+.stamp b{color:var(--green);font-weight:600}
+</style>
+</head>
+<body>
+<div class="head">
+  <div>
+    <p class="eyebrow">FIELD NOTES · VOL.06 · STACK MAP</p>
+    <h1>给 Agent <em>打分</em> · 技术栈全景</h1>
+  </div>
+  <div class="meta">造物手记 VOL.06<br/>2026.10<br/>StarrySea1412</div>
+</div>
+<p class="dek">一套评测设施由六层组成。越往上越接近「承诺」，越往下越接近「记录」。这张图不是指标清单，是责任划分：每一格都在回答同一个问题——这个数字凭什么可信？</p>
+
+<div class="legend"><span>LAYER</span><span>SUBSYSTEMS ／ 每一格 = 一个必须能自证的数字</span></div>
+
+<div class="layer">
+  <div class="lname"><b>L5</b><span>问题层</span></div>
+  <div class="cells">
+    <div class="cell key"><h3>承诺定义</h3><span class="en">PROMISE</span><p>先写「什么叫好」：可跳转的时间戳、可回查的证据、可读完的摘要。</p><span class="badge">FIRST</span></div>
+    <div class="cell"><h3>金标准</h3><span class="en">GOLD SET</span><p>人工独立标注 19 条 + 4 条视觉点；ASR 噪声在标注里修正。</p></div>
+    <div class="cell"><h3>用例切片</h3><span class="en">CASES</span><p>教程 / 评测 / 解说 / Vlog / 纯音频 / 无字幕；每类至少一份。</p></div>
+    <div class="cell"><h3>指标口径</h3><span class="en">METRICS</span><p>分子、分母、聚合层级三者必须同时写；单一百分比不合格。</p></div>
+  </div>
+</div>
+
+<div class="layer">
+  <div class="lname"><b>L4</b><span>判分层</span></div>
+  <div class="cells">
+    <div class="cell key"><h3>双重判定</h3><span class="en">MATCH</span><p>±15s 时间窗 + bigram ≥0.25；每条金标准只被一条预测认领。</p></div>
+    <div class="cell"><h3>阈值校准</h3><span class="en">THRESHOLD</span><p>0.22 生产 / 0.25 评测；0.34 会误杀 60% 真要点（实测）。</p></div>
+    <div class="cell key"><h3>置信区间</h3><span class="en">WILSON</span><p>3/19 → 5.5%–37.6%；小样本不许报单点。</p><span class="badge">CORE</span></div>
+    <div class="cell warn"><h3>异构判分</h3><span class="en">JUDGE MIX</span><p>bigram / Jaccard / 人工；共享同一盲区就是循环论证。</p><span class="badge">TODO</span></div>
+  </div>
+</div>
+
+<div class="layer">
+  <div class="lname"><b>L3</b><span>实验层</span></div>
+  <div class="cells">
+    <div class="cell"><h3>钉死渠道</h3><span class="en">PIN</span><p>base_url / key / model / role / api_format 全冻结；禁 failover。</p></div>
+    <div class="cell key"><h3>缓存身份</h3><span class="en">CACHE KEY</span><p>内容 + prompt + system + 后端身份 + ASR 不确定标注。</p></div>
+    <div class="cell warn"><h3>重试纪律</h3><span class="en">RETRY</span><p>传输层 5xx/429 可重试；内容失败零重试，json_repair 关闭。</p></div>
+    <div class="cell"><h3>预算与哈希</h3><span class="en">BUDGET</span><p>37 请求 / 5s 间隔 / 并发 1；13 个文件跑前跑后 SHA-256 一致。</p></div>
+  </div>
+</div>
+
+<div class="layer">
+  <div class="lname"><b>L2</b><span>回归层</span></div>
+  <div class="cells">
+    <div class="cell"><h3>合同测试</h3><span class="en">CONTRACT</span><p>3587 个用例 / 144 个文件 / 242 秒；证明机器没坏，不证明答得对。</p></div>
+    <div class="cell"><h3>金标准回归</h3><span class="en">GOLDEN</span><p>改动前后各跑 3 次，比均值与区间，不比单次最高分。</p></div>
+    <div class="cell key"><h3>质量门</h3><span class="en">QUALITY GATE</span><p>pass / review / fail；只体检不删内容，review 不单独放行。</p></div>
+    <div class="cell"><h3>版本对比</h3><span class="en">VERSIONS</span><p>同时钉住 case 版本、标注日期、模型身份与运行次数。</p></div>
+  </div>
+</div>
+
+<div class="layer">
+  <div class="lname"><b>L1</b><span>门禁层</span></div>
+  <div class="cells">
+    <div class="cell key"><h3>四道门</h3><span class="en">GATES</span><p>合同 → 金标准 → 质量门 → 人工；四门全过才 SHIP。</p><span class="badge">RELEASE</span></div>
+    <div class="cell"><h3>成绩单档位</h3><span class="en">SCORECARD</span><p>report_ok / skeleton_ok / unusable / gold_candidate。</p></div>
+    <div class="cell amber"><h3>阈值占位</h3><span class="en">PLACEHOLDER</span><p>JSON≥2/3、tokens≥800/2500 是先立结构后标定的占位线。</p></div>
+    <div class="cell"><h3>抽检队列</h3><span class="en">SAMPLING</span><p>高风险优先 + 分层配额 + 双人复核，算一致性。</p></div>
+  </div>
+</div>
+
+<div class="layer">
+  <div class="lname"><b>L0</b><span>记录层</span></div>
+  <div class="cells">
+    <div class="cell"><h3>结果 JSON</h3><span class="en">RESULTS</span><p>每次评测落库：命中 / 误差 / 幻觉 / 视觉增益 / missed_gold。</p></div>
+    <div class="cell"><h3>失败样本</h3><span class="en">FAILURES</span><p>降级报告拒评；失败渠道留在分母；stopped 记为 stopped。</p></div>
+    <div class="cell"><h3>账本</h3><span class="en">LEDGER</span><p>请求数 / token / 失败数逐条记，不把浪费混进正常用量。</p></div>
+    <div class="cell warn"><h3>评测集腐烂</h3><span class="en">ROT</span><p>holdout ≥30% · 季度换血 · 记录 case 版本 · 公开漏项。</p><span class="badge">WATCH</span></div>
+  </div>
+</div>
+
+<div class="foot">
+  <div>
+    <h4>WHY THIS SHAPE</h4>
+    <p>上面两层决定「分数是什么意思」，中间两层决定「这个分数可不可复现」，下面两层决定「什么时候允许发」。所有评测事故几乎都发生在两层之间的缝隙：指标没有分母、判分器和被测系统同源、门禁只看测试绿不绿。</p>
+    <p>这套设施目前只完成了骨架：一条真实金标准、一套夹具基线、一次被 524 掐断的受控重跑。它最大的价值不是给出了多少分，而是让每个分数都带着自己的适用范围。</p>
+  </div>
+  <div>
+    <h4>THE ARITHMETIC</h4>
+    <div class="eq">
+      3/19 = 15.8%，95% CI <b>5.5–37.6%</b><br/>
+      窗口 5s→30s：<i>5.3% → 26.3%</i><br/>
+      均值 92.42% / 加权 85.74% / 全分母 <i>79.31%</i><br/>
+      数字保留 <b>57.02%</b> vs <i>89.61%</i><br/>
+      70% vs 80% 分辨：<b>295 条/组</b>
+    </div>
+  </div>
+</div>
+
+<div class="stamp"><span>READ · <b>给 Agent 打分</b> · 评测不是分数，是一场可复现的实验</span><span>STARRYSEA · 造物手记 VOL.06</span></div>
+</body>
+</html>

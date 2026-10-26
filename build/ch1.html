@@ -1,0 +1,35 @@
+<section class="chapter" id="ch1">
+  <div class="ch-head">
+    <div class="ch-num">SECTION<b>01</b></div>
+    <div class="ch-title">
+      <h2>单次分数是噪声</h2>
+      <p>模型评测可以固定种子；Agent 评测连「同一条输入」都很难复现。一次跑分，只是一个样本。</p>
+    </div>
+  </div>
+  <div class="ch-body">
+    <p class="lede">先把一个常见的误解拆掉：Agent 的评测不是「给模型考试」。考试的前提是题目、答案、评分标准都不变，考生每次作答只影响分数；而 Agent 的一次运行里，<strong>题目会被它自己改写</strong>——它先下载视频、选字幕或转写、决定看哪几帧、分几段、用哪个渠道、缓存命中与否，最后才写出报告。任何一步不同，输出的报告就不同。</p>
+    <p>SeeFlow 的一条流水线有九个阶段：识别平台、建立文字轨、获取媒体、准备音轨、测量节奏、画面取证、总结、校验、渲染。每个阶段都有独立的失败模式：平台改版、字幕缺失、whisper 模型版本、视觉端点超时、渠道 429、缓存键失效、审核预算耗尽……其中任何一个都可能让最终分数变化，而它们和「模型聪不聪明」没有关系。</p>
+
+    <h3>同一条视频，两次运行可能不是同一道题</h3>
+    <p>举一个真实的状态差：那条 4 小时视频的 101 个分段里，94 段的归并结果来自 map 缓存、只有 7 段是现算的。输入一样，但<strong>计算路径</strong>不一样：缓存命中意味着模型看不到这些分段，只看到上次的结论。如果缓存键设计得不够严（比如只按视频 URL 做键），一次模型升级后的重跑会静默复用旧模型的结果——分数没变，但你已经不是在测新模型了。</p>
+    <p>SeeFlow 的缓存键把「分段内容 + prompt + system + 后端身份（base_url / key / model / role / api_format）+ 所有 ASR 不确定标注」一起哈希。换模型、换提示词、换渠道、甚至转写里的低置信词变了，缓存都会失效。这不是性能优化，是<strong>实验条件的一部分</strong>：缓存让同一条件重跑变快，但不允许换了条件还复用旧结果。</p>
+
+    <h3>第一道守卫：拒绝给降级报告打分</h3>
+    <p>评测设施最先要防的不是模型，是<strong>把无效样本算进分母</strong>。SeeFlow 的 <code>eval/run.py</code> 里有一段很短的守卫：如果预测条目为 0、且报告开头写着「降级版」，直接退出，不评分。原因很直白：降级报告是模型端点全挂时的兜底产物，它证明的是「系统没空手而归」，不是「模型答得好」。把它算进命中率，等于用一次停电阻断的考试去评价学生。</p>
+    <div class="code">
+      <div class="code-bar"><b>eval/run.py</b><span>load_predictions</span></div>
+<pre>n_pred = sum(len(result.get(k) or []) <span class="k">for</span> k <span class="k">in</span>
+             (<span class="s">"key_points"</span>, <span class="s">"sections"</span>, <span class="s">"macguffins"</span>, <span class="s">"decisions"</span>, <span class="s">"quotes"</span>))
+<span class="k">if</span> n_pred == <span class="n">0</span> <span class="k">and</span> md.exists() <span class="k">and</span> <span class="s">"降级版"</span> <span class="k">in</span> md.read_text(encoding=<span class="s">"utf-8"</span>)[:<span class="n">400</span>]:
+    <span class="k">raise</span> <span class="f">SystemExit</span>(<span class="s">"[eval] 任务 ... 是降级报告（模型端点故障），评测无效。"</span>)</pre>
+    </div>
+    <p>这段守卫在第一次真实跑批时就救了一次场：2026 年 9 月 10 日，21 次调用失败 18 次，产出降级报告。评测器拒绝评分并退出——如果它当时「宽容」一点，数据库里会多一条 0% 的记录，而那条记录会被后来的人当成「模型不行」的证据。<strong>评测的第一职责不是算分，是判断这次运行配不配被算分。</strong></p>
+
+    <h3>确定性夹具测的是合同，不是波动</h3>
+    <p>仓库里还有一套 12 份材料、120 条断言的基线（<code>eval/quality_baseline.py</code>），用模拟模型跑冷缓存、热缓存、重启重放与渠道失败四种场景。它连续跑了 9 次，四个聚合数字完全一致：正向命中率 92.42%、数字保留率 57.02%、负向泄漏 0/22。</p>
+    <p>这份「稳定」不是系统稳定的证明，而是夹具确定性的证明：模拟模型每次都按同一张表回答，缓存与重放也走同一条路径。它验证的是管线合同——断言有没有被带进报告、失败样本有没有留在分母、账本调用数对不对。它验证不了真实模型今天会不会抽风、渠道会不会 429、同一提示词两次采样会不会不同。把这两类测试混在一起，是评测里最常见的自欺。</p>
+    <div class="note"><b>所以本文把两类数字分开写：</b>「合同数字」（夹具、单测、问答验收）只证明系统按设计工作；「质量数字」（真实模型、金标准）才回答「它有多好」。前者的数量可以很大（3587 个用例），后者的数量必须诚实（目前只有一条真实用例）。</div>
+
+    <p>那么，一份真实输出到底能被量成什么样？下一章把四个指标拆开，你会看到同一份基线可以合法地算出五个不同的「命中率」——差别全在分子分母。</p>
+  </div>
+</section>

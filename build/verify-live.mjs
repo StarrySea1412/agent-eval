@@ -1,0 +1,31 @@
+// 线上验收：字体、图片、四枚小样关键状态、HTTP 失败
+import { createRequire } from "node:module";
+const require = createRequire("D:/project/machine-skill/node_modules/");
+const { chromium } = require("playwright");
+const base = process.argv[2] || "https://starrysea1412.github.io/agent-eval/";
+const browser = await chromium.launch({ headless: true });
+const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+const errors = [], failed = [];
+page.on("pageerror", (e) => errors.push(e.message));
+page.on("response", (r) => { if (r.status() >= 400) failed.push(r.status() + " " + r.url()); });
+await page.goto(base, { waitUntil: "networkidle", timeout: 60000 });
+await page.evaluate(() => document.fonts.ready);
+const font = await page.evaluate(() => document.fonts.check('16px "LXGW WenKai"'));
+const imgs = await page.evaluate(() => [...document.images].map((i) => i.getAttribute("src")));
+for (const src of imgs) { const r = await page.request.get(new URL(src, base).href); if (!r.ok()) failed.push(r.status() + " (img) " + src); }
+await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+await page.waitForTimeout(500);
+const lazy = await page.evaluate(() => [...document.images].filter((i) => i.naturalWidth === 0).map((i) => i.src));
+await page.evaluate(() => window.scrollTo(0, 0));
+await page.click('#judge-modes button[data-j="time"]');
+await page.waitForTimeout(100);
+const d2 = await page.evaluate(() => ({ score: document.querySelector("#judge-score").textContent.trim(), fp: document.querySelector("#judge-fp").textContent }));
+await page.evaluate(() => { const n = document.querySelector("#ci-n"); n.value = "62"; n.dispatchEvent(new Event("input", { bubbles: true })); });
+const d1 = await page.evaluate(() => document.querySelector("#ci-overlap").textContent);
+await page.evaluate(() => { const g = document.querySelector('#gates .gate[data-g="human"]'); g.click(); });
+const d4 = await page.evaluate(() => document.querySelector("#gate-v").textContent);
+console.log("font:", font, "| images:", imgs.length, "| lazy-broken:", lazy.length ? lazy : "none");
+console.log("D2 time:", JSON.stringify(d2), "| D1 n=62 overlap:", d1, "| D4 ship:", d4);
+console.log("pageerrors:", errors.length ? errors : "none");
+console.log("http failures:", failed.length ? failed : "none");
+await browser.close();

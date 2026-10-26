@@ -1,0 +1,1428 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="color-scheme" content="light"/>
+<meta name="theme-color" content="#f2f3ee"/>
+<link rel="preload" href="assets/fonts/wenkai-regular.woff2" as="font" type="font/woff2" crossorigin/>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' fill='%23f2f3ee'/%3E%3Crect x='3' y='17.5' width='18' height='1.3' fill='%232f6f57'/%3E%3Crect x='5' y='9' width='2.4' height='8.5' fill='none' stroke='%232f6f57' stroke-width='1.2'/%3E%3Crect x='10.8' y='5' width='2.4' height='12.5' fill='none' stroke='%232f6f57' stroke-width='1.2'/%3E%3Crect x='16.6' y='11.5' width='2.4' height='6' fill='none' stroke='%232f6f57' stroke-width='1.2'/%3E%3Ccircle cx='12' cy='3' r='1.3' fill='%239c3b2e'/%3E%3C/svg%3E"/>
+<meta name="description" content="给 Agent 打分：评测不是分数，是一场可复现的实验。金标准、判分器、置信区间、受控重跑与发布门禁——SeeFlow 评测设施的深度解剖，附四枚可玩小样。"/>
+<meta name="author" content="StarrySea1412"/>
+<meta property="og:title" content="给 Agent 打分 · 造物手记 VOL.06"/>
+<meta property="og:description" content="同一份输出，三种判分器给出 0/19、3/19、5/19。分数不是一个数，是一个区间。"/>
+<meta property="og:type" content="article"/>
+<meta property="og:image" content="assets/art/hero.webp"/>
+<title>给 Agent 打分 · 造物手记 VOL.06</title>
+<style>
+/* 《给 Agent 打分》· 造物手记 VOL.06
+   冷色实验纸：不是米色旧纸，是实验室的记录本——格纸、墨线、红蓝铅笔。 */
+@font-face{font-family:"LXGW WenKai";src:url("assets/fonts/wenkai-regular.woff2") format("woff2");font-weight:300 599;font-style:normal;font-display:swap}
+@font-face{font-family:"LXGW WenKai";src:url("assets/fonts/wenkai-medium.woff2") format("woff2");font-weight:600 900;font-style:normal;font-display:swap}
+:root{
+  --paper:#f2f3ee;--surface:#fbfcf8;--ink:#1a1d1f;--ink-soft:#3f4649;--muted:#6b7376;--faint:#8d9597;
+  --line:#d5d9d1;--line-soft:#e6e9e2;
+  --green:#2f6f57;--green-soft:#e0eee8;--green-deep:#1f4d3c;
+  --amber:#a9761c;--amber-soft:#f5ead2;
+  --blue:#2f5570;--blue-soft:#e2ebf1;
+  --red:#9c3b2e;--red-soft:#f4e3df;
+  --serif:"LXGW WenKai","Songti SC","STSong","Noto Serif CJK SC",serif;
+  --sans:"LXGW WenKai",-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,"SFMono-Regular",Consolas,"Liberation Mono",monospace;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:28px}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);line-height:1.95;-webkit-font-smoothing:antialiased;text-spacing:ideograph-alpha;
+  background-image:linear-gradient(rgba(47,85,112,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(47,85,112,.035) 1px,transparent 1px);
+  background-size:28px 28px}
+::selection{background:#cfe0d8;color:#0e1a15}
+a{color:var(--blue);text-underline-offset:4px;text-decoration-thickness:1px}
+a:hover{color:var(--red)}
+button,a,input,select,toggle{touch-action:manipulation}
+button{cursor:pointer;color:inherit;font:inherit}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--amber);outline-offset:3px}
+img{display:block;max-width:100%;height:auto}
+p{margin:0 0 1.25em}
+h1,h2,h3,h4{line-height:1.45;text-wrap:balance;margin:0}
+h1,h2,h3{font-family:var(--serif)}
+strong{font-weight:650;color:#0f1314}
+code{font-family:var(--mono);font-size:.86em;background:var(--blue-soft);color:#24404f;padding:.12em .38em;border-radius:3px;overflow-wrap:anywhere}
+em{font-style:normal;color:var(--red)}
+.progress{position:fixed;inset:0 auto auto 0;height:3px;width:100%;background:linear-gradient(90deg,var(--green),var(--amber));transform:scaleX(0);transform-origin:left;z-index:60;pointer-events:none}
+.wrap{max-width:1180px;margin:auto;padding-inline:36px}
+.prose{max-width:768px;margin-inline:auto}
+
+/* masthead */
+.masthead{display:flex;align-items:center;justify-content:space-between;gap:18px;padding-block:22px 16px;border-bottom:1.5px solid var(--ink);font-size:12px;letter-spacing:.1em;color:var(--muted)}
+.brand{display:flex;align-items:center;gap:11px;font-weight:650;color:var(--ink)}
+.brand-mark{width:24px;height:24px;display:grid;place-items:center;border:1px solid var(--ink);border-radius:2px;background:var(--surface)}
+.brand-mark svg{width:15px;height:15px;display:block}
+.brand small{font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--green);font-weight:700}
+.edition{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;display:flex;gap:14px;align-items:center}
+.edition .lab{display:inline-flex;align-items:center;gap:7px;color:var(--green)}
+.lab-dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:blink 2.6s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
+
+/* hero */
+.hero{padding-block:56px 40px;display:grid;grid-template-columns:1.04fr .96fr;gap:52px;align-items:center}
+.eyebrow{display:inline-flex;align-items:center;gap:10px;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;color:var(--muted);margin:0 0 24px;background:var(--surface);border:1px solid var(--line);padding:6px 13px 6px 8px;border-radius:2px}
+.eyebrow span{color:var(--red);letter-spacing:.16em;font-weight:700;padding-right:11px;border-right:1px solid var(--line)}
+.hero h1{font-size:clamp(46px,5.2vw,74px);font-weight:800;line-height:1.12;letter-spacing:-.04em;margin:0 0 20px}
+.hero h1 em{color:var(--green)}
+.hero h1 .sub{display:block;font-size:.4em;font-weight:400;letter-spacing:.02em;color:var(--ink-soft);margin-top:14px;line-height:1.7}
+.dek-wrap{margin:0 0 26px;max-width:560px;border-left:3px solid var(--green);padding-left:20px}
+.dek-tag{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--green);letter-spacing:.09em;margin:0 0 9px}
+.dek{font-size:16.5px;line-height:1.92;color:var(--ink-soft);margin:0}
+.hero-meta{display:flex;flex-wrap:wrap;gap:8px}
+.pill{font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;color:var(--muted);border:1px solid var(--line);border-radius:2px;padding:6px 11px;background:var(--surface)}
+.pill b{color:var(--ink);font-weight:700}
+.art{margin:0;position:relative}
+.screen{border:1.5px solid var(--ink);background:var(--surface);padding:9px;box-shadow:9px 10px 0 rgba(47,85,112,.10)}
+.screen-img{position:relative;overflow:hidden;background:#0f1113}
+.screen-img img{width:100%;aspect-ratio:4/3;object-fit:cover;filter:saturate(.95)}
+.tc-bar{display:flex;justify-content:space-between;align-items:center;gap:10px;font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--muted);padding:9px 4px 2px}
+.tc-bar .tc{color:var(--amber)}
+.art figcaption{font-size:11.5px;color:var(--faint);margin-top:10px;line-height:1.7;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-family:var(--mono);letter-spacing:.03em}
+.art figcaption b{color:var(--green);font-weight:700}
+
+/* stats */
+.stats{border-block:1.5px solid var(--ink);background:rgba(251,252,248,.7)}
+.stats-inner{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);max-width:none;padding-inline:0}
+.stat{background:var(--surface);padding:16px 22px}
+.stat b{display:block;font-family:var(--mono);font-size:23px;letter-spacing:-.02em;color:var(--ink);line-height:1.25}
+.stat b span{font-size:11px;color:var(--faint);letter-spacing:.04em;margin-left:3px}
+.stat small{display:block;font-size:11px;color:var(--muted);letter-spacing:.04em;margin-top:3px}
+
+/* opening + toc */
+.opening{padding-block:50px 20px}
+.lead{font-size:19.5px;line-height:1.98;color:var(--ink)}
+.lead::first-letter{float:left;font-size:64px;line-height:.84;padding:9px 13px 0 0;color:var(--green);font-weight:800}
+.scope{font-size:12.5px;color:var(--muted);border-top:1px solid var(--line);padding-top:15px;margin-top:28px;font-family:var(--mono);line-height:1.85}
+.toc-head{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid var(--line);padding-bottom:9px;margin:32px 0 0;font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:var(--faint)}
+.toc{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-top:0;margin:0 0 56px}
+.toc a{background:var(--surface);padding:14px 18px;text-decoration:none;color:var(--ink);display:grid;grid-template-columns:60px 1fr;gap:12px;align-items:baseline;transition:background .18s}
+.toc a:hover{background:var(--green-soft);color:var(--ink)}
+.toc a i{font-family:var(--mono);font-style:normal;font-size:10.5px;color:var(--red);letter-spacing:.04em}
+.toc a span{font-size:14px}
+.toc a small{display:block;font-size:11px;color:var(--faint);margin-top:2px;line-height:1.6}
+
+/* chapters */
+.chapter{padding-block:50px 18px;border-top:1px solid var(--line)}
+.ch-head{display:grid;grid-template-columns:92px 1fr;gap:22px;align-items:start;margin:0 auto 32px;max-width:980px}
+.ch-num{font-family:var(--mono);font-size:13px;color:var(--green);letter-spacing:.08em;padding-top:13px;border-top:2px solid var(--green);line-height:1.5}
+.ch-num b{display:block;font-size:34px;color:var(--ink);letter-spacing:-.02em;font-weight:700;line-height:1.1}
+.ch-title h2{font-size:clamp(30px,3.4vw,43px);font-weight:750;letter-spacing:-.025em;line-height:1.25}
+.ch-title p{color:var(--muted);font-size:14px;margin:9px 0 0;line-height:1.8;max-width:640px}
+.ch-body{max-width:768px;margin-inline:auto}
+.ch-body h3{font-size:22px;font-weight:700;margin:42px 0 14px;letter-spacing:-.01em;padding-left:13px;border-left:3px solid var(--green)}
+.ch-body h4{font-size:16px;font-weight:650;margin:26px 0 8px;color:var(--blue)}
+.ch-body ul,.ch-body ol{padding-left:1.35em;margin:0 0 1.3em}
+.ch-body li{margin:.4em 0}
+.ch-body li::marker{color:var(--red)}
+.lede{font-size:17px;color:var(--ink-soft);line-height:1.95}
+.pull{border-left:3px solid var(--red);background:linear-gradient(90deg,var(--red-soft),transparent 70%);padding:17px 22px;margin:28px 0;font-family:var(--serif);font-size:19px;line-height:1.85;color:var(--ink)}
+.pull b{color:var(--red);font-weight:700}
+.note{font-size:13px;color:var(--muted);border-left:1px solid var(--line);padding-left:14px;margin:22px 0;line-height:1.85}
+.note b{color:var(--ink-soft)}
+.fig{margin:32px auto;max-width:980px;position:relative;left:50%;transform:translateX(-50%);width:min(940px,calc(100vw - 72px))}
+.fig .frame{border:1.5px solid var(--ink);background:var(--surface);padding:8px;box-shadow:7px 8px 0 rgba(47,85,112,.08)}
+.fig img{width:100%}
+.fig figcaption{font-family:var(--mono);font-size:11.5px;color:var(--faint);letter-spacing:.03em;margin-top:9px;line-height:1.75;display:flex;gap:10px;align-items:baseline}
+.fig figcaption b{color:var(--red);font-weight:700}
+
+/* code */
+.code{margin:24px 0;border:1px solid var(--line);background:#101416;overflow:hidden}
+.code-bar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 13px;border-bottom:1px solid #262d31;font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:#7c878c;background:#171c1f}
+.code-bar b{color:#9fc3b4;font-weight:600}
+.code pre{margin:0;padding:15px 16px 17px;overflow-x:auto;font-family:var(--mono);font-size:12.4px;line-height:1.77;color:#c9d3d6;tab-size:2}
+.code pre .c{color:#6e7a7f}
+.code pre .k{color:#e0a08b}
+.code pre .s{color:#a9c4a0}
+.code pre .n{color:#d9b26a}
+.code pre .f{color:#9dbccc}
+
+/* formula */
+.formula{margin:26px 0;border:1.5px solid var(--ink);background:var(--surface);padding:18px 22px;text-align:center;box-shadow:5px 6px 0 rgba(47,85,112,.07)}
+.formula .eq{font-family:var(--mono);font-size:clamp(14px,1.8vw,18px);letter-spacing:.01em;color:var(--green-deep);line-height:1.9}
+.formula .eq var{font-style:italic;color:var(--red)}
+.formula small{display:block;font-family:var(--mono);font-size:10.5px;color:var(--faint);letter-spacing:.04em;margin-top:8px;line-height:1.7}
+.formula .why{font-size:13px;color:var(--muted);margin:11px auto 0;max-width:620px;line-height:1.8;text-align:left}
+
+/* table */
+.tablewrap{overflow-x:auto;margin:24px 0;border:1px solid var(--line);background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:560px}
+th,td{text-align:left;padding:10px 13px;border-bottom:1px solid var(--line-soft);vertical-align:top;line-height:1.7}
+th{background:#eef0e9;font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--muted);font-weight:700}
+tr:last-child td{border-bottom:0}
+td b{color:#0f1314;font-weight:650}
+td code{font-size:11.5px}
+.num{font-family:var(--mono);font-size:12.5px;color:var(--red);white-space:nowrap}
+
+/* demos */
+.demo{max-width:1000px;margin:42px auto;border:1.5px solid var(--ink);background:var(--surface);overflow:hidden;box-shadow:10px 12px 0 rgba(47,85,112,.08)}
+.demo-head{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:11px 17px;border-bottom:1px solid var(--line);background:#eef0e9;flex-wrap:wrap}
+.demo-tag{font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--red);font-weight:700}
+.demo-title{font-size:15px;font-weight:650;margin-left:auto;display:flex;align-items:center;gap:9px}
+.demo-title .hint{font-family:var(--mono);font-size:10px;color:var(--faint);font-weight:400;letter-spacing:.03em}
+.demo-body{padding:18px 18px 16px}
+.controls{display:flex;flex-wrap:wrap;gap:16px 26px;align-items:flex-end;padding-bottom:14px;border-bottom:1px solid var(--line-soft);margin-bottom:14px}
+.ctl{min-width:150px;flex:1}
+.ctl label{display:flex;justify-content:space-between;align-items:baseline;font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--muted);margin-bottom:6px}
+.ctl label b{color:var(--red);font-weight:700;font-size:12px}
+input[type=range]{appearance:none;width:100%;height:24px;background:transparent;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:3px;background:var(--line);border-radius:2px}
+input[type=range]::-webkit-slider-thumb{appearance:none;width:14px;height:14px;border-radius:50%;background:var(--green);border:2px solid var(--surface);margin-top:-6px;box-shadow:0 0 0 1px var(--green)}
+.seg{display:inline-flex;border:1px solid var(--line);background:var(--surface);flex-wrap:wrap}
+.seg button{background:transparent;border:0;padding:6px 11px;font-family:var(--mono);font-size:10.5px;color:var(--muted);letter-spacing:.02em}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed=true]{background:var(--green);color:#f7fbf8;font-weight:700}
+.switch{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:10.5px;color:var(--muted);letter-spacing:.02em;cursor:pointer;user-select:none}
+.switch input{appearance:none;width:32px;height:17px;border-radius:9px;background:var(--line);position:relative;cursor:pointer;transition:background .18s}
+.switch input::after{content:"";position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;background:var(--faint);transition:transform .18s,background .18s}
+.switch input:checked{background:#bcd8cc}
+.switch input:checked::after{transform:translateX(15px);background:var(--green)}
+.demo-out{min-height:40px}
+.hintline{font-family:var(--mono);font-size:10.5px;color:var(--faint);line-height:1.7;letter-spacing:.01em}
+.demo-foot{border-top:1px solid var(--line-soft);padding:10px 17px;font-family:var(--mono);font-size:10px;color:var(--faint);letter-spacing:.02em;line-height:1.75}
+.demo-foot b{color:var(--blue);font-weight:600}
+.big-num{display:flex;gap:26px;align-items:baseline;margin:2px 0 12px;flex-wrap:wrap}
+.big-num div{font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--faint)}
+.big-num div b{display:block;font-size:26px;color:var(--ink);letter-spacing:-.02em;line-height:1.3}
+.big-num div b em{color:var(--red);font-style:normal}
+
+/* D1 confidence */
+.ci-wrap{display:grid;grid-template-columns:1fr 250px;gap:18px}
+.ci-plot{position:relative;height:170px;border:1px solid var(--line);background:#fdfefb;overflow:hidden}
+.ci-axis{position:absolute;left:36px;right:14px;bottom:24px;height:1px;background:var(--line)}
+.ci-tick{position:absolute;bottom:16px;font-family:var(--mono);font-size:9px;color:var(--faint);transform:translateX(-50%)}
+.ci-grid{position:absolute;top:0;bottom:24px;left:36px;right:14px}
+.ci-grid i{position:absolute;top:0;bottom:0;width:1px;background:#eef0e9}
+.ci-row{position:absolute;left:36px;right:14px;height:26px;display:flex;align-items:center}
+.ci-row .lbl{position:absolute;left:-34px;width:32px;font-family:var(--mono);font-size:9.5px;color:var(--muted);text-align:right}
+.ci-bar{position:absolute;height:10px;background:var(--blue);opacity:.85;top:8px}
+.ci-bar.b{background:var(--amber)}
+.ci-dot{position:absolute;width:9px;height:9px;border-radius:50%;background:var(--red);top:9px;transform:translateX(-50%);border:2px solid #fff}
+.ci-side{border-left:1px solid var(--line-soft);padding-left:15px;font-family:var(--mono);font-size:10.5px;color:var(--muted)}
+.ci-side .row{display:flex;justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px dashed var(--line-soft)}
+.ci-side .row b{color:var(--ink);font-weight:700}
+.ci-verdict{margin-top:10px;font-family:var(--sans);font-size:12px;line-height:1.7;color:var(--ink-soft);background:var(--green-soft);border-left:2px solid var(--green);padding:8px 10px}
+
+/* D2 judge */
+.judge-grid{display:grid;grid-template-columns:1fr 300px;gap:18px}
+.judge-list{max-height:330px;overflow:auto;border:1px solid var(--line);background:#fdfefb}
+.jrow{display:grid;grid-template-columns:44px 1fr 54px;gap:9px;align-items:start;padding:8px 10px;border-bottom:1px solid var(--line-soft);font-size:12px;line-height:1.6}
+.jrow:last-child{border-bottom:0}
+.jrow .t{font-family:var(--mono);font-size:10.5px;color:var(--muted)}
+.jrow .g{color:var(--ink-soft)}
+.jrow .p{color:var(--faint);font-size:11px;margin-top:2px}
+.jrow .mark{font-family:var(--mono);font-size:9.5px;text-align:right;letter-spacing:.04em}
+.jrow.hit{background:var(--green-soft)}
+.jrow.hit .mark{color:var(--green);font-weight:700}
+.jrow.miss .mark{color:var(--faint)}
+.judge-side{border-left:1px solid var(--line-soft);padding-left:15px}
+.judge-side .score{font-family:var(--mono);font-size:34px;color:var(--ink);line-height:1.1}
+.judge-side .score small{font-size:12px;color:var(--faint)}
+.judge-side .def{font-family:var(--mono);font-size:10.5px;color:var(--muted);line-height:1.7;margin-top:4px}
+.judge-side .subrow{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--faint);padding:5px 0;border-bottom:1px dashed var(--line-soft)}
+
+/* D3 runs */
+.runs-plot{position:relative;height:190px;border:1px solid var(--line);background:#fdfefb;margin-bottom:12px}
+.runs-base{position:absolute;left:20px;right:20px;bottom:26px;height:1px;background:var(--line)}
+.runs-dot{position:absolute;width:8px;height:8px;border-radius:50%;background:var(--blue);opacity:.65;transform:translate(-50%,50%)}
+.runs-mean{position:absolute;left:20px;right:20px;height:1px;background:var(--red)}
+.runs-band{position:absolute;left:20px;right:20px;background:rgba(156,59,46,.08);border-top:1px dashed rgba(156,59,46,.4);border-bottom:1px dashed rgba(156,59,46,.4)}
+.runs-label{position:absolute;font-family:var(--mono);font-size:9px;color:var(--faint)}
+.runs-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.runs-stats div{border:1px solid var(--line);background:#fdfefb;padding:8px 10px}
+.runs-stats b{display:block;font-family:var(--mono);font-size:18px;color:var(--ink);line-height:1.3}
+.runs-stats small{font-family:var(--mono);font-size:9px;color:var(--faint);letter-spacing:.04em}
+
+/* D4 gates */
+.gates{display:grid;gap:8px;margin-bottom:12px}
+.gate{display:grid;grid-template-columns:30px 1fr auto;gap:11px;align-items:center;border:1px solid var(--line);background:#fdfefb;padding:10px 12px}
+.gate .no{font-family:var(--mono);font-size:11px;color:var(--faint)}
+.gate .lbl b{display:block;font-size:13.5px}
+.gate .lbl small{font-family:var(--mono);font-size:10px;color:var(--faint)}
+.gate .st{font-family:var(--mono);font-size:10px;padding:2px 8px;border:1px solid var(--line);color:var(--faint)}
+.gate.pass{border-color:#b9d6c8;background:var(--green-soft)}
+.gate.pass .st{color:var(--green);border-color:#9cc7b5}
+.gate.fail{border-color:#e2b3ab;background:var(--red-soft)}
+.gate.fail .st{color:var(--red);border-color:#d79a90}
+.gate-verdict{display:flex;justify-content:space-between;align-items:center;gap:14px;border-top:1.5px solid var(--ink);padding-top:12px;flex-wrap:wrap}
+.gate-verdict .v{font-family:var(--mono);font-size:15px;font-weight:700;letter-spacing:.04em}
+.gate-verdict .v.ship{color:var(--green)}
+.gate-verdict .v.block{color:var(--red)}
+.gate-verdict .why{font-family:var(--mono);font-size:10.5px;color:var(--muted);line-height:1.7;max-width:600px}
+
+/* epilogue */
+.epilogue{max-width:768px;margin:0 auto;padding-block:38px 18px}
+.epilogue h2{font-size:clamp(28px,3vw,38px);margin-bottom:16px}
+.rules{display:grid;gap:10px;margin:24px 0 28px}
+.rule{border:1px solid var(--line);border-left:3px solid var(--green);background:var(--surface);padding:14px 17px}
+.rule b{display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;color:var(--green);margin-bottom:5px}
+.rule p{margin:0;font-size:14.5px;color:var(--ink-soft);line-height:1.85}
+.limits{border-top:1px solid var(--line);padding-top:18px;font-size:13.5px;color:var(--muted)}
+.limits b{color:var(--ink-soft)}
+.links{display:flex;flex-wrap:wrap;gap:9px;margin:24px 0 8px}
+.links a{font-family:var(--mono);font-size:11px;letter-spacing:.03em;border:1px solid var(--line);padding:7px 12px;text-decoration:none;color:var(--blue);background:var(--surface)}
+.links a:hover{border-color:var(--red);color:var(--red)}
+
+.site-foot{border-top:1.5px solid var(--ink);margin-top:50px;padding-block:22px 36px;display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap;font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;color:var(--faint)}
+.site-foot a{color:var(--muted)}
+.foot-note{font-size:10.5px;color:#7b8385;line-height:1.8;max-width:580px}
+
+@media (max-width:980px){
+  .hero{grid-template-columns:1fr;gap:30px;padding-block:40px 30px}
+  .hero h1{font-size:clamp(40px,8vw,56px)}
+  .stats-inner{grid-template-columns:repeat(2,1fr)}
+  .ch-head{grid-template-columns:64px 1fr;gap:16px}
+  .ch-num b{font-size:26px}
+  .ci-wrap,.judge-grid{grid-template-columns:1fr}
+  .ci-side,.judge-side{border-left:0;border-top:1px solid var(--line-soft);padding-left:0;padding-top:10px}
+  .toc{grid-template-columns:1fr}
+  .runs-stats{grid-template-columns:repeat(2,1fr)}
+}
+@media (max-width:620px){
+  .wrap{padding-inline:16px}
+  .masthead{font-size:10px;letter-spacing:.05em}
+  .edition .lab{display:none}
+  .hero h1{font-size:38px}
+  .lead{font-size:17.5px}
+  .ch-head{grid-template-columns:1fr;gap:6px}
+  .ch-num{border-top:0;padding-top:0;display:flex;align-items:baseline;gap:10px}
+  .ch-num b{font-size:22px}
+  .ch-title h2{font-size:27px}
+  .ch-body h3{font-size:19px}
+  .demo-body{padding:12px}
+  .demo-title .hint{display:none}
+  .code pre{font-size:11.3px}
+  .jrow{grid-template-columns:36px 1fr 44px}
+}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
+}
+@media print{body{background:#fff}.progress,.demo,.art,.links,.toc,.site-foot{display:none}}
+
+</style>
+</head>
+<body>
+<div class="progress" id="progress"></div>
+<header class="wrap masthead">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="17.5" width="18" height="1.4" fill="#2f6f57"/><rect x="5" y="9" width="2.6" height="8.5" fill="none" stroke="#2f6f57" stroke-width="1.2"/><rect x="10.7" y="5" width="2.6" height="12.5" fill="none" stroke="#2f6f57" stroke-width="1.2"/><rect x="16.4" y="11.5" width="2.6" height="6" fill="none" stroke="#2f6f57" stroke-width="1.2"/><circle cx="12" cy="3" r="1.4" fill="#9c3b2e"/></svg></span>
+    <span>造物手记 <small>VOL.06</small></span>
+  </div>
+  <div class="edition">
+    <span class="lab"><i class="lab-dot" aria-hidden="true"></i>EVAL / 校准中</span>
+    <span>NOTEBOOK 06 · 2026.10</span>
+  </div>
+</header>
+
+<section class="wrap hero">
+  <div>
+    <p class="eyebrow"><span>FIELD NOTES</span>一次可复现的 Agent 评测</p>
+    <h1>给 Agent<br/><em>打分</em><span class="sub">分数不是一个数，是一个区间；<br/>评测不是判决，是一场实验</span></h1>
+    <div class="dek-wrap">
+      <p class="dek-tag">本片提要</p>
+      <p class="dek">同一份 14 条要点的省流，三种判分器给出 <b>0/19、3/19、5/19</b>；同一个 3/19，把时间窗从 5 秒放宽到 30 秒，分数就从 5.3% 变成 26.3%。这篇拆 SeeFlow 的评测设施：金标准怎么造、判分器怎么校准、置信区间怎么算、以及一次只跑了 8 个请求就被掐断的实验为什么仍然有效。</p>
+    </div>
+    <div class="hero-meta">
+      <span class="pill"><b>19</b> 条金标准</span>
+      <span class="pill"><b>4</b> 条视觉点</span>
+      <span class="pill"><b>40</b> 个问答用例</span>
+      <span class="pill"><b>3587</b> 个合同测试</span>
+    </div>
+  </div>
+  <figure class="art">
+    <div class="screen">
+      <div class="screen-img">
+        <img src="assets/art/hero.webp" alt="一只带镜头眼睛的纸鹤站在实验室长桌前，面前是一台三根指针指向不同数值的仪表，旁边散落砝码与金色标尺" width="1152" height="832"/>
+      </div>
+      <div class="tc-bar"><span>LAB / CALIBRATION 06</span><span class="tc">3 READINGS &nbsp; 1 INSTRUMENT</span></div>
+    </div>
+    <figcaption><span><b>FIG. 00</b> 三根指针，一台仪器：先量尺子，再量东西</span><span>INK &amp; GOUACHE / 2026</span></figcaption>
+  </figure>
+</section>
+
+<section class="stats" aria-label="关键数字">
+  <div class="wrap stats-inner">
+    <div class="stat"><b>0<span>/19</span></b><small>逐字匹配判分器的命中</small></div>
+    <div class="stat"><b>3<span>/19</span></b><small>bigram + ±15s 的命中</small></div>
+    <div class="stat"><b>5<span>/19</span></b><small>只看时间窗的「命中」</small></div>
+    <div class="stat"><b>5.3<span>%→26.3%</span></b><small>同一份输出，换个窗口的分数</small></div>
+  </div>
+</section>
+
+<div class="wrap opening">
+  <div class="prose">
+    <p class="lead">先看一个让人不舒服的事实。影视飓风那条 18 分钟的视频，SeeFlow 在 signals 模式下产出了一份 14 条要点的省流——读起来相当像样：颁奖名单、参数、价格都在。拿它去对 19 条人工金标准：<strong>逐字匹配命中 0 条，bigram + ±15 秒命中 3 条，只看时间窗能「命中」5 条。</strong>同一份输出，三个判分器给出三个分数，最大的差了一整个量级。</p>
+    <p>这不是在说谁「作弊」。三个判分器都在诚实地执行自己的规则：逐字匹配要求一字不差，天然不适合摘要；只看时间窗太宽松，同一时刻聊三件事会被全部算中；bigram 卡在中间，但它只认字面重叠，抓不住同义改写。真正的问题是：<em>当你说「这个系统 79% 正确」时，你用的是哪把尺子？</em></p>
+    <p>这篇是「造物手记」的评测篇。前五篇都在讲怎么造——设计、记忆、内核、一个真的会看画面的 agent。这一篇讲怎么知道造得对不对：金标准怎么独立标注、判分器怎么被校准、一个小样本的分数到底能说明什么、以及一次实验在什么条件下才算「可复现」。所有数字都来自 SeeFlow 仓库里真实的评测设施与结果，不是教科书摘抄。</p>
+    <p class="scope">阅读说明：全文约一万一千字（含代码与图注），七章 + 四枚小样。第 1 章讲为什么单次分数是噪声；第 2 章拆指标的分子分母；第 3 章造金标准与置信区间；第 4 章校准判分器；第 5 章钉死实验条件；第 6 章把评测接进发布门禁；第 7 章讲人的位置与评测集的腐烂。四枚小样都是确定性模型，参数与公式写在正文里。</p>
+  </div>
+
+  <p class="toc-head"><span>NOTEBOOK INDEX / 实验记录</span><span>07 SECTIONS · 04 DEMOS</span></p>
+  <nav class="toc" aria-label="目录">
+    <a href="#ch1"><i>01 / 00:00</i><span>单次分数是噪声<small>Agent 评测为什么比模型评测更难：非确定、长链、有副作用</small></span></a>
+    <a href="#ch2"><i>02 / 06:20</i><span>指标的解剖<small>命中率、时间误差、幻觉率、视觉增益——每个数都有分子分母</small></span></a>
+    <a href="#ch3"><i>03 / 13:10</i><span>金标准与置信区间<small>19 条能说明什么？3/19 的 95% 区间是 5.5%–37.6%</small></span></a>
+    <a href="#ch4"><i>04 / 21:00</i><span>判分器也要被评测<small>逐字、时间窗、bigram、LLM 裁判；循环论证与阈值敏感</small></span></a>
+    <a href="#ch5"><i>05 / 29:40</i><span>实验纪律<small>钉死渠道、缓存、重试与预算；8 个请求的实验为什么有效</small></span></a>
+    <a href="#ch6"><i>06 / 38:20</i><span>回归与门禁<small>3587 个合同测试、金标准回归、四级发布门</small></span></a>
+    <a href="#ch7"><i>07 / 46:30</i><span>人的位置<small>抽检、被纠正次数、以及一份全员通过的体检</small></span></a>
+    <a href="#closing"><i>END / 54:00</i><span>结语：允许分数不好看<small>三条可以搬走的做法，和这篇文没解决的问题</small></span></a>
+  </nav>
+</div>
+
+<main>
+<section class="chapter" id="ch1">
+  <div class="ch-head">
+    <div class="ch-num">SECTION<b>01</b></div>
+    <div class="ch-title">
+      <h2>单次分数是噪声</h2>
+      <p>模型评测可以固定种子；Agent 评测连「同一条输入」都很难复现。一次跑分，只是一个样本。</p>
+    </div>
+  </div>
+  <div class="ch-body">
+    <p class="lede">先把一个常见的误解拆掉：Agent 的评测不是「给模型考试」。考试的前提是题目、答案、评分标准都不变，考生每次作答只影响分数；而 Agent 的一次运行里，<strong>题目会被它自己改写</strong>——它先下载视频、选字幕或转写、决定看哪几帧、分几段、用哪个渠道、缓存命中与否，最后才写出报告。任何一步不同，输出的报告就不同。</p>
+    <p>SeeFlow 的一条流水线有九个阶段：识别平台、建立文字轨、获取媒体、准备音轨、测量节奏、画面取证、总结、校验、渲染。每个阶段都有独立的失败模式：平台改版、字幕缺失、whisper 模型版本、视觉端点超时、渠道 429、缓存键失效、审核预算耗尽……其中任何一个都可能让最终分数变化，而它们和「模型聪不聪明」没有关系。</p>
+
+    <h3>同一条视频，两次运行可能不是同一道题</h3>
+    <p>举一个真实的状态差：那条 4 小时视频的 101 个分段里，94 段的归并结果来自 map 缓存、只有 7 段是现算的。输入一样，但<strong>计算路径</strong>不一样：缓存命中意味着模型看不到这些分段，只看到上次的结论。如果缓存键设计得不够严（比如只按视频 URL 做键），一次模型升级后的重跑会静默复用旧模型的结果——分数没变，但你已经不是在测新模型了。</p>
+    <p>SeeFlow 的缓存键把「分段内容 + prompt + system + 后端身份（base_url / key / model / role / api_format）+ 所有 ASR 不确定标注」一起哈希。换模型、换提示词、换渠道、甚至转写里的低置信词变了，缓存都会失效。这不是性能优化，是<strong>实验条件的一部分</strong>：缓存让同一条件重跑变快，但不允许换了条件还复用旧结果。</p>
+
+    <h3>第一道守卫：拒绝给降级报告打分</h3>
+    <p>评测设施最先要防的不是模型，是<strong>把无效样本算进分母</strong>。SeeFlow 的 <code>eval/run.py</code> 里有一段很短的守卫：如果预测条目为 0、且报告开头写着「降级版」，直接退出，不评分。原因很直白：降级报告是模型端点全挂时的兜底产物，它证明的是「系统没空手而归」，不是「模型答得好」。把它算进命中率，等于用一次停电阻断的考试去评价学生。</p>
+    <div class="code">
+      <div class="code-bar"><b>eval/run.py</b><span>load_predictions</span></div>
+<pre>n_pred = sum(len(result.get(k) or []) <span class="k">for</span> k <span class="k">in</span>
+             (<span class="s">"key_points"</span>, <span class="s">"sections"</span>, <span class="s">"macguffins"</span>, <span class="s">"decisions"</span>, <span class="s">"quotes"</span>))
+<span class="k">if</span> n_pred == <span class="n">0</span> <span class="k">and</span> md.exists() <span class="k">and</span> <span class="s">"降级版"</span> <span class="k">in</span> md.read_text(encoding=<span class="s">"utf-8"</span>)[:<span class="n">400</span>]:
+    <span class="k">raise</span> <span class="f">SystemExit</span>(<span class="s">"[eval] 任务 ... 是降级报告（模型端点故障），评测无效。"</span>)</pre>
+    </div>
+    <p>这段守卫在第一次真实跑批时就救了一次场：2026 年 9 月 10 日，21 次调用失败 18 次，产出降级报告。评测器拒绝评分并退出——如果它当时「宽容」一点，数据库里会多一条 0% 的记录，而那条记录会被后来的人当成「模型不行」的证据。<strong>评测的第一职责不是算分，是判断这次运行配不配被算分。</strong></p>
+
+    <h3>确定性夹具测的是合同，不是波动</h3>
+    <p>仓库里还有一套 12 份材料、120 条断言的基线（<code>eval/quality_baseline.py</code>），用模拟模型跑冷缓存、热缓存、重启重放与渠道失败四种场景。它连续跑了 9 次，四个聚合数字完全一致：正向命中率 92.42%、数字保留率 57.02%、负向泄漏 0/22。</p>
+    <p>这份「稳定」不是系统稳定的证明，而是夹具确定性的证明：模拟模型每次都按同一张表回答，缓存与重放也走同一条路径。它验证的是管线合同——断言有没有被带进报告、失败样本有没有留在分母、账本调用数对不对。它验证不了真实模型今天会不会抽风、渠道会不会 429、同一提示词两次采样会不会不同。把这两类测试混在一起，是评测里最常见的自欺。</p>
+    <div class="note"><b>所以本文把两类数字分开写：</b>「合同数字」（夹具、单测、问答验收）只证明系统按设计工作；「质量数字」（真实模型、金标准）才回答「它有多好」。前者的数量可以很大（3587 个用例），后者的数量必须诚实（目前只有一条真实用例）。</div>
+
+    <p>那么，一份真实输出到底能被量成什么样？下一章把四个指标拆开，你会看到同一份基线可以合法地算出五个不同的「命中率」——差别全在分子分母。</p>
+  </div>
+</section>
+
+<section class="chapter" id="ch2">
+  <div class="ch-head">
+    <div class="ch-num">SECTION<b>02</b></div>
+    <div class="ch-title">
+      <h2>指标的解剖</h2>
+      <p>一个分数至少有三个东西：分子、分母、以及你决定把谁放进分母。三个都能合法地变。</p>
+    </div>
+  </div>
+  <div class="ch-body">
+    <p class="lede">评测报告里最常见的写法是「命中率 92.4%」。这句话几乎总是缺了半句：<em>在什么分母上</em>。SeeFlow 的夹具基线里，同一批 12 份材料、120 条断言，可以合法地算出四个正向命中率，以及两个数字保留率。它们都不是造假，差别只在「把哪些样本算进来」。</p>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>口径</th><th>算法</th><th>结果</th><th>它回答的问题</th></tr></thead>
+        <tbody>
+          <tr><td><b>材料均值</b></td><td>11 份成功材料的命中率取平均</td><td class="num">92.42%</td><td>「一份典型材料」有多好</td></tr>
+          <tr><td><b>剔除压力样本</b></td><td>去掉 FloodModel 的 m04，Σ命中 / Σ断言</td><td class="num">91.09%</td><td>「正常材料」有多好</td></tr>
+          <tr><td><b>断言加权</b></td><td>Σ命中 / Σ断言（仅成功材料，111 条）</td><td class="num">85.74%</td><td>「一条典型断言」有多容易被覆盖</td></tr>
+          <tr><td><b>全请求分母</b></td><td>Σ命中 / 全部 120 条（含失败渠道 m07）</td><td class="num">79.31%</td><td>「发出去的每一次请求」的期望</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>从 92.4% 到 79.3%，中间差了 13 个百分点，全部来自「m04 这个故意失控的压力样本算不算」和「m07 这个渠道失败的样本算不算」。这两种算法都有道理：产品经理关心「用户拿到的报告有多好」，应该剔除失败样本；SRE 关心「一次请求的成功期望」，必须把失败算进去。<strong>错的是只报一个数，不说口径。</strong></p>
+    <p>数字保留率更典型。聚合代码写的是 <code>round(sum(r["generation"]["numeric_retention"] or 0 for r in scored) / len(scored), 4)</code>——注意那个 <code>or 0</code>。四份「纯音频 / 无字幕」材料没有数字断言，<code>numeric_retention</code> 是 <code>None</code>，于是被当成 0 分计入分母。结果是：</p>
+    <div class="formula">
+      <div class="eq">57.02% = 6.27 / 11 &nbsp;&nbsp;（4 份无数字断言的材料按 0 计）</div>
+      <div class="eq">89.61% = 6.27 / 7 &nbsp;&nbsp;（只算有数字断言的 7 份）</div>
+      <small>同一份基线、同一批输出，两个数字都「真实」；差 32.6 个百分点，全部来自分母</small>
+      <p class="why">这不是说 57.02% 错了。它回答的是「如果随机抽一份材料，它的数字保留期望是多少」，把「没有数字可保留」算作 0 是一种保守口径。但如果标题只写「数字保留率仅 57%」，读者会以为模型丢了一半数字——而它实际丢掉的是 0.27 的那一份压力样本。</p>
+    </div>
+    <p>这件事的教训不是「选一个正确口径」，而是：<strong>每个指标都要带三个附件——分子、分母、以及分母为什么长这样。</strong> 一个没有分母说明的百分比，和一句「效果很好」没有区别。</p>
+
+    <figure class="fig">
+      <div class="frame"><img src="assets/art/instruments.webp" alt="纸鹤站在暗色长桌前，桌上三个相同的小物件分别配着表盘、天平和尺子，三个读数明显不一致" width="1280" height="768"/></div>
+      <figcaption><b>FIG. 01</b>三台仪器，三个读数：同一份输出，换一个口径就是另一个分数。</figcaption>
+    </figure>
+
+    <h3>四个指标，四种盲区</h3>
+    <p>SeeFlow 的金标准评测用四个指标。它们不是四个角度，是四种不同的盲区：</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>指标</th><th>定义</th><th>它抓什么</th><th>它抓不到什么</th></tr></thead>
+        <tbody>
+          <tr><td><b>要点命中率</b></td><td>19 条金标准里，有多少条在 ±15s 内、且 bigram ≥0.25 被预测覆盖</td><td>内容覆盖面</td><td>同义改写、语序重排、以及「说了但说错」</td></tr>
+          <tr><td><b>时间误差中位</b></td><td>命中对的 |Δt| 中位数</td><td>跳转体验</td><td>没命中的条目（它们连误差都没有）</td></tr>
+          <tr><td><b>幻觉率</b></td><td>预测断言在 ±15s 窗口里找不到文本支撑的比例</td><td>编造与张冠李戴</td><td>真实但只存在于画面里的事实</td></tr>
+          <tr><td><b>视觉增益</b></td><td>4 条「只有看画面才能写对」的命中数</td><td>视觉能力是否真的生效</td><td>视觉之外的画面价值</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>那次 18 分钟实跑的结果：命中 <strong>3/19</strong>，命中对的时间误差中位 <strong>13.0 秒</strong>，幻觉率 <strong>1/14 = 7.14%</strong>，视觉增益 <strong>0/4</strong>。四个数字放在一起，故事才完整：覆盖面很低（3/19），但说出来的东西基本有依据（幻觉 7%），而画面理解这次完全缺席（0/4）。单看任何一个都会误判。</p>
+    <div class="note"><b>最讽刺的一条：</b>被幻觉率判为「无支撑」的那句是「最佳外观奖得主是适马 BF，精致铝合金机身」（相似度 0.222，差 0.028 过线）。它恰好是视觉金标准里的一条——画面里真的是铝合金机身，只是字幕没提。同一个句子，在「幻觉率」里是可疑，在「视觉增益」里本该是命中（但相似度不够没算上）。<strong>指标量的从来不是真理，是「在它自己的证据域里对不对得上」。</strong></div>
+
+    <h3>别把「平均」当成「典型」</h3>
+    <p>材料均值 92.42% 看着漂亮，但它是 11 个数的算术平均，其中 10 个是 100%、1 个是 16.67%。换成断言加权就掉到 85.74%，因为 m04 一个样本就占了 19 条断言（16%），而它的命中只有 3 条。<strong>平均值的稳定性，取决于你有没有让一个极端样本掌握足够多的权重。</strong></p>
+    <p>这也是为什么长视频评测要特别小心：一条 4 小时视频切 101 段，如果按「材料均值」算，它只是 1 份材料；如果按「断言加权」算，它可能占整个评测集一半的权重。同一套数字，换一个聚合层级，结论可能反过来。SeeFlow 目前只有一条真实长视频用例，所以任何「长视频能力」的结论都只能当假设看——第 7 章会讲这个样本量问题。</p>
+    <p>下一章先解决最上游的问题：金标准本身是怎么来的，以及 19 条到底能支撑多细的结论。</p>
+  </div>
+</section>
+
+<section class="chapter" id="ch3">
+  <div class="ch-head">
+    <div class="ch-num">SECTION<b>03</b></div>
+    <div class="ch-title">
+      <h2>金标准与置信区间</h2>
+      <p>19 条金标准能告诉你「大概在哪个区间」，不能告诉你「比上周高了 3 个百分点」。</p>
+    </div>
+  </div>
+  <div class="ch-body">
+    <p class="lede">SeeFlow 的唯一真实金标准用例，是那条 18 分钟的影视飓风颁奖片。做法很笨：一个人把原始 whisper 字幕从头读到尾，独立标出 19 条要点；再把「只有看画面才能写对」的 4 条单独标成视觉点。标注时不参考任何管线输出，ASR 的错字（「影视剧风」「加能」「CLOCK 3」）在金标准里改正——因为金标准考的是内容，不是谁的转写更准。</p>
+    <p>这份标注有三个刻意的设计，值得逐条说：</p>
+    <ul>
+      <li><strong>独立标注。</strong>金标准不能由被测系统参与生成，否则就是自证。标注者只拿原始字幕和视频，不看报告。</li>
+      <li><strong>改写正确写法。</strong>「加能」改「佳能」，「CLOCK 3」改「C-Log 3」。这会让「照抄转写」的系统得低分，让「理解后改写」的系统得高分——是故意的。</li>
+      <li><strong>视觉点单列。</strong>4 条视觉点不混进 19 条总分，单独构成「视觉增益」的分母。否则视觉能力会被字幕能力稀释（详见第 4 章）。</li>
+    </ul>
+
+    <figure class="fig">
+      <div class="frame"><img src="assets/art/golden-ruler.webp" alt="纸鹤用钢针在一根金色长尺上刻细密的刻度，旁边放着水平仪、砝码和放大镜" width="1280" height="768"/></div>
+      <figcaption><b>FIG. 02</b>金标准是一把刻出来的尺子：刻度越细，越贵，也越容易被磨掉。</figcaption>
+    </figure>
+
+    <h3>19 条能说明什么：一个区间，不是一个点</h3>
+    <p>3/19 = 15.8%。这个数字本身没有意义，除非你把它放进抽样误差里。对于二项分布的小样本，常用的 95% 置信区间是 Wilson 区间：</p>
+    <div class="formula">
+      <div class="eq">CI = ( p + z²/2n ± z·√(p(1−p)/n + z²/4n²) ) / (1 + z²/n)</div>
+      <small>p = k/n，z = 1.96（95%）；n 是金标准条数，k 是命中数</small>
+      <p class="why">为什么不用最简单的 p ± 1.96·√(p(1−p)/n)？因为在小样本、极端比例（0 或 1）时它会算出负数或超过 1 的区间。Wilson 区间在 n=19、k=3 时给出 [5.5%, 37.6%]，仍然很宽，但至少不会越界。</p>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>观测</th><th>点估计</th><th>95% Wilson 区间</th><th>这个区间意味着</th></tr></thead>
+        <tbody>
+          <tr><td class="num">3 / 19</td><td>15.8%</td><td class="num">5.5% – 37.6%</td><td>「真实能力」可能在 6% 到 38% 之间</td></tr>
+          <tr><td class="num">5 / 19</td><td>26.3%</td><td class="num">11.8% – 48.8%</td><td>换一个判分器，区间整体右移但仍重叠</td></tr>
+          <tr><td class="num">15 / 19</td><td>78.9%</td><td class="num">56.7% – 91.5%</td><td>看起来很好，但仍可能与 60% 的系统无法区分</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>换句话说：<strong>3/19 和 5/19 的区间大幅重叠，你不能说「换判分器后提升了 10 个百分点」；15/19 和 12/19 也可能重叠，你不能说「这版比上版好」。</strong> 19 条金标准的分辨率，大概只够区分「基本不会」和「基本都会」，不够区分「70 分」和「80 分」。</p>
+    <p>要多少条才够？如果目标是把 95% 区间的半宽压到 ±10 个百分点，在 p≈0.8 时需要约 <strong>62 条</strong>；如果要在 80% 统计功效下区分 70% 与 80% 两个系统，每组需要约 <strong>295 条</strong>。SeeFlow 现在有 19 条，差了整整一个数量级。这不是懒惰，是标注成本：一条 18 分钟视频标 19 条要花几个小时，而 295 条意味着十几条视频、几十个小时的人工——这还没算标注者之间的一致性检验。</p>
+    <div class="note"><b>样本量的诚实写法：</b>「19 条金标准，3 条命中，点估计 15.8%，95% 区间 5.5%–37.6%」。而不是「命中率 15.8%」。前者告诉你「别拿它做精细比较」，后者鼓励你拿它做精细比较。</div>
+
+    <h3>标注者只有一个人</h3>
+    <p>还有一个没解决的问题：这份金标准只有一个标注者，没有算标注者间一致性（inter-annotator agreement）。同一条「最佳外观奖」到底算不算「要点」、参数要不要拆成多条，换一个人可能标出 16 条或 23 条。没有第二个人独立标注，就无法区分「系统漏了」和「标注者的口味不同」。</p>
+    <p>这是当前评测设施的真实缺口，不应该被「19 条金标准」这个说法掩盖。改进方向很清楚：再找一个人独立标同一份，算 Cohen's κ；低于 0.7 就先修标注规范，而不是急着跑模型。但这需要另一个人的时间，不是代码能解决的。</p>
+
+    <p>下面这枚小样把置信区间画出来。拖金标准条数和命中数，看区间怎么变；再切换两个系统，看它们的区间是否重叠——重叠的时候，任何「A 比 B 好」的结论都不成立。</p>
+  </div>
+
+  <div class="demo" id="demo-ci">
+    <div class="demo-head">
+      <span class="demo-tag">DEMO 01</span>
+      <span class="demo-title">置信区间尺 <span class="hint">19 条金标准的分辨率，比你想象的粗</span></span>
+    </div>
+    <div class="demo-body">
+      <div class="controls">
+        <div class="ctl">
+          <label for="ci-n">金标准条数 n <b id="ci-n-v">19</b></label>
+          <input id="ci-n" type="range" min="5" max="200" step="1" value="19"/>
+        </div>
+        <div class="ctl">
+          <label for="ci-k">系统 A 命中 k <b id="ci-k-v">3</b></label>
+          <input id="ci-k" type="range" min="0" max="19" step="1" value="3"/>
+        </div>
+        <div class="ctl">
+          <label for="ci-k2">系统 B 命中 k <b id="ci-k2-v">5</b></label>
+          <input id="ci-k2" type="range" min="0" max="19" step="1" value="5"/>
+        </div>
+        <div class="ctl" style="flex:0 0 auto">
+          <label>预设</label>
+          <div class="seg" id="ci-presets">
+            <button data-p="3,5,19" aria-pressed="true">3 vs 5</button>
+            <button data-p="15,12,19" aria-pressed="false">15 vs 12</button>
+            <button data-p="62,55,62" aria-pressed="false">62 条</button>
+          </div>
+        </div>
+      </div>
+      <div class="ci-wrap">
+        <div>
+          <div class="ci-plot" id="ci-plot">
+            <div class="ci-grid" id="ci-grid"></div>
+            <div class="ci-axis"></div>
+            <div id="ci-rows"></div>
+            <div id="ci-ticks"></div>
+          </div>
+          <div class="big-num" style="margin-top:12px">
+            <div>A 点估计<b id="ci-pa">15.8%</b></div>
+            <div>A 区间<b id="ci-ia">5.5–37.6%</b></div>
+            <div>B 点估计<b id="ci-pb">26.3%</b></div>
+            <div>B 区间<b id="ci-ib">11.8–48.8%</b></div>
+          </div>
+        </div>
+        <div class="ci-side">
+          <div class="row"><span>区间是否重叠</span><b id="ci-overlap">是</b></div>
+          <div class="row"><span>可区分结论</span><b id="ci-conclusion">不成立</b></div>
+          <div class="row"><span>±10% 半宽所需 n</span><b id="ci-need">62</b></div>
+          <div class="ci-verdict" id="ci-verdict">两个区间大幅重叠：这点差异完全可能是抽样噪声，不能宣称 B 更好。</div>
+          <p class="hintline" style="margin-top:10px">区间用 Wilson 95%；「可区分」只表示两个 95% 区间不重叠，是保守近似，不是正式显著性检验。</p>
+        </div>
+      </div>
+    </div>
+    <div class="demo-foot"><b>模型</b> Wilson score interval，z=1.96。±10% 半宽所需 n 按 1.96²·p(1−p)/0.1²，取 p=0.8（62 条）。示意分数取自真实的 3/19、5/19、15/19，不含任何模拟生成。</div>
+  </div>
+</section>
+
+<section class="chapter" id="ch4">
+  <div class="ch-head">
+    <div class="ch-num">SECTION<b>04</b></div>
+    <div class="ch-title">
+      <h2>判分器也要被评测</h2>
+      <p>同一份输出，逐字判 0 分，时间窗判 5 分，bigram 判 3 分。尺子本身也是被测对象。</p>
+    </div>
+  </div>
+  <div class="ch-body">
+    <p class="lede">评测最容易被忽略的一层，是「判分」本身。大家都盯着被测系统，却默认尺子是准的。可尺子有三个可调参数：<strong>匹配方式、时间窗、相似阈值</strong>。任何一个动了，分数都会动——而且动得比模型升级还大。</p>
+    <p>还是那份 18 分钟实跑的 14 条要点。四种判分器，四种结果：</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>判分器</th><th>规则</th><th>命中</th><th>它相信什么</th></tr></thead>
+        <tbody>
+          <tr><td><b>逐字匹配</b></td><td>预测文本与金标准完全相同（或仅空白差异）</td><td class="num">0 / 19</td><td>只有原话才算对——但摘要的天职就是改写，所以它必然接近 0</td></tr>
+          <tr><td><b>只看时间窗</b></td><td>±15s 内有任意一条预测就算命中</td><td class="num">5 / 19</td><td>同一时刻的预测必然相关——但同一时刻可能聊三件事</td></tr>
+          <tr><td><b>bigram + 时间窗</b></td><td>±15s 且二字组命中率 ≥0.25</td><td class="num">3 / 19</td><td>改写的字面重叠仍然可测——但同义改写会漏</td></tr>
+          <tr><td><b>词元 Jaccard</b></td><td>±15s 且词元集合 Jaccard ≥0.3</td><td class="num">3 / 19</td><td>按词而不是按字重叠——对中文分词质量敏感</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>逐字匹配的 0 分不是「系统全错」，是「判分器选错了任务」。时间窗的 5 分里有 2 条是假阳性：预测确实在正确时刻附近，但说的是另一件事。bigram 和 Jaccard 都判 3 条，说明这 3 条是「字面也像、词也像」的硬命中；剩下的真要点大多是改写，字面判分器天然抓不到。</p>
+
+    <figure class="fig">
+      <div class="frame"><img src="assets/art/judge.webp" alt="纸鹤扮成法官，举着镜头形状的法槌，站在两架明显失衡的天平之间" width="1280" height="768"/></div>
+      <figcaption><b>FIG. 03</b>判分器不是天平，是另一件被测的仪器：它自己也会偏。</figcaption>
+    </figure>
+
+    <h3>时间窗挪 25 秒，分数翻五倍</h3>
+    <p>固定判分方式为 bigram、阈值 0.15，只改时间窗：</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>时间窗</th><th>命中</th><th>命中率</th><th>多出来的是什么</th></tr></thead>
+        <tbody>
+          <tr><td class="num">±5s</td><td>1 / 19</td><td>5.3%</td><td>只有时间戳几乎完全对齐的</td></tr>
+          <tr><td class="num">±15s</td><td>3 / 19</td><td>15.8%</td><td>章节级归并带来的十几秒偏移</td></tr>
+          <tr><td class="num">±30s</td><td>5 / 19</td><td>26.3%</td><td>邻近话题被「捞」进来，真假混杂</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>同一份输出，5.3% 到 26.3%，五倍。如果你只看到「26.3%」，会以为系统还不错；只看到「5.3%」，会以为它废了。两个数字都是真的，差别只在允许多大的时间误差。<strong>而时间窗不是随便定的：它应该匹配产品的实际体验。</strong> SeeFlow 的跳转体验要求 ±1–2 秒，但章节级摘要允许十几秒的归并误差——所以评测用 ±15s，并在报告里写清楚。</p>
+    <p>阈值同理。在 ±30s 窗口下：阈值 0.15 命中 5 条，0.22 命中 4 条，0.25 命中 4 条，0.30 命中 3 条，0.35 命中 3 条。从 0.15 到 0.35，只掉了 2 条，但这两条恰好是「内容相关、措辞较远」的真要点。<strong>判分器越严，它测得越像「复制能力」，越不像「理解能力」。</strong></p>
+
+    <h3>循环论证：裁判和选手共用一把尺</h3>
+    <p>这里有一个必须承认的设计缺陷：SeeFlow 的校验层用 bigram 判断「断言有没有依据」，评测层又用同一个 <code>_hit_ratio</code> 判断「预测有没有命中金标准」，连幻觉率也是同一个函数。这意味着：</p>
+    <ul>
+      <li>一个擅长复述原话的系统，会在校验层通过、在评测层得分高——但它可能并不理解；</li>
+      <li>一个擅长同义改写的系统，会在校验层被判低支持率、在评测层被判漏命中——但它可能是更好的摘要；</li>
+      <li>「幻觉率低」可能只是「它说的话都能在字幕里找到原词」，不等于「它说的是对的」。</li>
+    </ul>
+    <p>这是自指评测的经典问题：裁判用和选手一样的尺子，量出来的只是「像不像选手」。缓解办法有三条，SeeFlow 只做到了第一条：</p>
+    <ol>
+      <li><strong>金标准完全独立于被测系统</strong>（做到了：人工通读原始字幕）；</li>
+      <li><strong>至少再有一个异构判分器</strong>（没做：目前只有 bigram / Jaccard 两种字面判分，共享同一个盲区）；</li>
+      <li><strong>人工抽检作为最终裁决</strong>（有流程，但没有系统化抽样，见第 7 章）。</li>
+    </ol>
+
+    <h3>为什么暂时不用 LLM 当裁判</h3>
+    <p>一个自然的想法是：让另一个模型来判分，不就不循环了吗？不一定。LLM 裁判有它自己的偏差：偏好更长的答案、偏好和自己风格相近的措辞、对数字和单位的核对不如代码可靠、而且同一提示词两次判分也可能不一致。更麻烦的是，裁判模型往往和被评测模型来自同一批渠道——它们共享训练数据里的偏好。</p>
+    <p>SeeFlow 在生产里确实有一次 LLM 审核（<code>reviewer.py</code>），但它被限制得很窄：只杀「与记录直接矛盾」和「编造实体」两类错，材料不足只能标 <code>insufficient</code>，不能删。它不参与评测打分。<strong>把 LLM 裁判放进评测主指标之前，必须先有一份人工校准集，证明它的判断和人类一致</strong>——这份校准集目前还没有。</p>
+    <div class="note"><b>一个反直觉的结论：</b>判分器的选择应该由「产品承诺」决定，而不是由「哪个分数好看」决定。SeeFlow 承诺的是「可点击跳转的时间戳」，所以时间窗要紧（±15s）；承诺的是「综合改写」，所以判分必须容忍改写（bigram 而不是逐字）。先写承诺，再选尺子。</div>
+
+    <p>下面这枚小样用真实的 19 条金标准和那次实跑的 14 条预测，把四种判分器并排放。切换判分器，看哪些条目从「漏」变成「中」、哪些始终不变——那些始终不变的，才是真正被系统抓住的内容。</p>
+  </div>
+
+  <div class="demo" id="demo-judge">
+    <div class="demo-head">
+      <span class="demo-tag">DEMO 02</span>
+      <span class="demo-title">判分器对照台 <span class="hint">同一份预测，四种尺子，四个分数</span></span>
+    </div>
+    <div class="demo-body">
+      <div class="controls">
+        <div class="ctl" style="flex:0 0 auto">
+          <label>判分器</label>
+          <div class="seg" id="judge-modes">
+            <button data-j="exact" aria-pressed="false">逐字</button>
+            <button data-j="time" aria-pressed="false">只看时间</button>
+            <button data-j="bigram" aria-pressed="true">bigram</button>
+            <button data-j="jaccard" aria-pressed="false">Jaccard</button>
+          </div>
+        </div>
+        <div class="ctl">
+          <label for="judge-window">时间窗 <b id="judge-window-v">±15s</b></label>
+          <input id="judge-window" type="range" min="5" max="60" step="5" value="15"/>
+        </div>
+        <div class="ctl">
+          <label for="judge-th">相似阈值 <b id="judge-th-v">0.25</b></label>
+          <input id="judge-th" type="range" min="0.10" max="0.60" step="0.05" value="0.25"/>
+        </div>
+      </div>
+      <div class="judge-grid">
+        <div class="judge-list" id="judge-list"></div>
+        <div class="judge-side">
+          <div class="score" id="judge-score">3 <small>/ 19</small></div>
+          <div class="def" id="judge-def">bigram ≥ 0.25，且 |Δt| ≤ 15s；每条金标准只能被一条预测认领</div>
+          <div class="subrow"><span>命中率</span><b id="judge-rate">15.8%</b></div>
+          <div class="subrow"><span>假阳性（时间对内容错）</span><b id="judge-fp">2</b></div>
+          <div class="subrow"><span>真实预测条数</span><b>14</b></div>
+          <div class="subrow"><span>金标准条数</span><b>19</b></div>
+        </div>
+      </div>
+    </div>
+    <div class="demo-foot"><b>数据</b> 金标准来自 eval/cases/yingshi-2025-awards/gold.json（人工独立标注 19 条）；预测来自 work/f1b818c4/省流.md 的 14 条真实要点。判分逻辑与 eval/run.py 同构；逐字与只看时间是本演示的对照尺，不是正式评测口径。</div>
+  </div>
+</section>
+
+<section class="chapter" id="ch5">
+  <div class="ch-head">
+    <div class="ch-num">SECTION<b>05</b></div>
+    <div class="ch-title">
+      <h2>实验纪律</h2>
+      <p>评测的可信度不来自分数，来自「换一个人照这份记录重跑，能不能得到同一结论」。</p>
+    </div>
+  </div>
+  <div class="ch-body">
+    <p class="lede">第 1 章说过，Agent 的运行路径会因为缓存、渠道、模型版本而变。所以一次有效的评测必须先把这些变量钉死，再谈分数。SeeFlow 把这套纪律写成了一个受控重跑脚本：不给它真实视频、不重新转写、不重新下载，只把<strong>已经保存的证据</strong>喂给一个<strong>钉死的渠道</strong>，并且给这次实验设一个硬预算。</p>
+
+    <h3>一次只跑了 8 个请求的实验</h3>
+    <p>那份记录的参数是这样的：</p>
+    <div class="code">
+      <div class="code-bar"><b>eval/results/xiaobai-…/requests.json</b><span>受控重跑</span></div>
+<pre><span class="s">"max_requests"</span>: <span class="n">37</span>, <span class="s">"min_gap_s"</span>: <span class="n">5.0</span>, <span class="s">"max_concurrency"</span>: <span class="n">1</span>,
+<span class="s">"automatic_retries"</span>: <span class="n">12</span>, <span class="s">"json_repair"</span>: <span class="k">false</span>, <span class="s">"failover"</span>: <span class="k">false</span>,
+<span class="s">"retry_scope"</span>: <span class="s">"transport HTTP 5xx/429/timeout only; content failures never retry"</span>,
+<span class="s">"physical_requests"</span>: <span class="n">8</span>, <span class="s">"stopped_reason"</span>: <span class="s">"HTTP 524: error code: 524"</span></pre>
+    </div>
+    <p>它在第 8 个物理请求时被渠道的 524 掐断，状态是 stopped，不是 done。从「质量评测」的角度，这次实验<strong>没有结果</strong>——没跑完，不能算命中率。但从「基础设施评测」的角度，它给出了三个有效结论：</p>
+    <ul>
+      <li>这个渠道在 8 个请求内就会撞上 524 墙，不能用于长报告生成；</li>
+      <li>预算控制生效了：37 次上限、5 秒间隔、并发 1，没有把失败放大成一次烧钱事故；</li>
+      <li>内容失败零重试的纪律生效了：8 次请求、19,829 token、3 次失败，账本逐条记清。</li>
+    </ul>
+    <p><strong>一个失败的实验也是结果，只要失败的原因被记录。</strong>最怕的不是跑挂，是跑挂了却把半截数据当成绩。</p>
+
+    <h3>为什么内容失败绝不重试</h3>
+    <p>这是整套纪律里最反直觉的一条。模型返回了 200，但要点过不了校验——再试一次，可能就过了。为什么不试？</p>
+    <p>因为一旦允许「内容失败重试」，「命中率」就变成了「重试次数」的函数。A 系统每次必错但重试 5 次能蒙对 2 次，B 系统一次就对 3 次——按最终报告算，A 可能赢。更糟的是，不同模型的「重试收益」不一样：有的模型是稳定地错，有的模型是随机地错，重试次数会系统性地偏袒后者。<strong>评测要量的是「一次做对的能力」，不是「反复试错直到对的能力」。</strong></p>
+    <p>所以受控重跑把 <code>json_repair</code> 也关了——连「首轮不是 JSON，原地再修一次」都不允许。传输层的 5xx/429/超时仍然重试（那是网络问题，不是模型问题），但内容层的失败直接丢弃、计入覆盖失败。这条规则让不同模型之间的比较第一次变得有意义。</p>
+
+    <h3>完整性哈希：证明实验没有偷偷改材料</h3>
+    <p>受控重跑在开始前和结束后各算一次受保护文件的 SHA-256：meta、manifest、request、result、debug、timing、timeline、transcript、edits、resources、省流.md、省流.html、思维导图。13 个文件，两次哈希必须完全一致。这不是防外人，是防自己：任何一次「顺手修一下源材料」都会让实验失去可比性。</p>
+    <p>这类检查听起来琐碎，但它是「可复现」的最低成本实现。没有它，你永远不知道两次分数差异是模型变了，还是某次重跑时有人改了输入。</p>
+
+    <h3>单次分数是抽样，不是测量</h3>
+    <p>即使把渠道、缓存、提示词全钉死，模型采样仍然有随机性（SeeFlow 默认 temperature 0.2，不是 0）。同一提示词跑 5 次，可能得到 3 次 15/19、1 次 14/19、1 次 16/19。如果你只报最好那次，分数会系统性偏高；只报最差那次，会系统性偏低。</p>
+    <p>正确做法是<strong>先定运行次数，再报全部结果</strong>：跑 5 次，报均值、标准差和每一次的分数；如果要比较两个系统，用同一运行次数、同一批材料，并报告区间。<strong>「best-of-5」不是评测，是选秀。</strong></p>
+    <div class="formula">
+      <div class="eq">report = (n_runs, mean, sd, all_runs) &nbsp;&nbsp;≠&nbsp;&nbsp; max(runs)</div>
+      <small>n_runs 必须在看到结果之前定好；事后加跑属于 p-hacking</small>
+      <p class="why">如果只跑得起 1 次，就老实写「单次运行，未估计方差」。这比假装稳定要好——至少读者知道该打多少折扣。</p>
+    </div>
+
+    <p>下面的小样模拟「真实能力 80% 的系统」重复跑若干次。你会看到：单次分数可能落在 60% 到 95% 之间；跑 5 次取均值，仍然可能偏离；跑 20 次，均值才稳定下来。那些看起来「突然变好」的版本，很多时候只是抽样运气。</p>
+  </div>
+
+  <div class="demo" id="demo-runs">
+    <div class="demo-head">
+      <span class="demo-tag">DEMO 03</span>
+      <span class="demo-title">重复运行 <span class="hint">同一系统，同一能力，不同的运气</span></span>
+    </div>
+    <div class="demo-body">
+      <div class="controls">
+        <div class="ctl">
+          <label for="runs-p">真实能力 p <b id="runs-p-v">0.80</b></label>
+          <input id="runs-p" type="range" min="0.40" max="0.95" step="0.01" value="0.80"/>
+        </div>
+        <div class="ctl">
+          <label for="runs-n">运行次数 <b id="runs-n-v">12</b></label>
+          <input id="runs-n" type="range" min="1" max="60" step="1" value="12"/>
+        </div>
+        <div class="ctl">
+          <label for="runs-total">每轮断言数 <b id="runs-total-v">19</b></label>
+          <input id="runs-total" type="range" min="19" max="100" step="1" value="19"/>
+        </div>
+        <div class="ctl" style="flex:0 0 auto">
+          <label>种子</label>
+          <div class="seg" id="runs-seed">
+            <button data-s="1" aria-pressed="true">2026</button>
+            <button data-s="2" aria-pressed="false">换一组</button>
+          </div>
+        </div>
+      </div>
+      <div class="runs-plot" id="runs-plot"></div>
+      <div class="runs-stats">
+        <div><b id="runs-mean">80.0%</b><small>均值</small></div>
+        <div><b id="runs-sd">—</b><small>标准差</small></div>
+        <div><b id="runs-min">—</b><small>最低一次</small></div>
+        <div><b id="runs-max">—</b><small>最高一次</small></div>
+      </div>
+      <p class="hintline" id="runs-note" style="margin-top:10px"></p>
+    </div>
+    <div class="demo-foot"><b>模型</b> 每轮 = Binomial(n=每轮断言数, p=真实能力) 的一次抽样，种子固定可复现。它演示的是「抽样波动」，不是真实模型的误差结构（真实模型还会有系统性偏差，那部分重复跑也消不掉）。</div>
+  </div>
+</section>
+
+<section class="chapter" id="ch6">
+  <div class="ch-head">
+    <div class="ch-num">SECTION<b>06</b></div>
+    <div class="ch-title">
+      <h2>回归与门禁</h2>
+      <p>3587 个测试全绿，不等于可以发。测试证明机器没坏，不证明它答得对。</p>
+    </div>
+  </div>
+  <div class="ch-body">
+    <p class="lede">评测的终点不是一份报告，是一个决定：这一版能不能发。SeeFlow 把决定拆成四道门，每道门回答不同的问题。它们不能互相替代，也不该互相打折。</p>
+
+    <h3>第一道门：合同测试（3587 个）</h3>
+    <p>仓库现在有 144 个测试文件、3587 个用例（另有 19 个子测试），本机跑完 242 秒。它们覆盖的东西非常具体：时间戳贴回、bigram 命中率、引文词边界、OCR 交叉、覆盖账本、缓存键、路径穿越、并发锁、降级报告、评测计算。全部通过。</p>
+    <p>这些测试证明的是<strong>合同</strong>：给定这些输入，系统一定做出这些判断。它们不证明内容质量——测试里的「模型」是模拟的，断言的也是管线行为。把合同测试当成质量证明，是工程团队最常见的自我安慰：绿色对勾让人安心，但它只说明机器没坏。</p>
+    <div class="code">
+      <div class="code-bar"><b>3587 个用例的分工</b><span>大致比例</span></div>
+<pre><span class="c"># 真正会调用模型的：不到一成</span>
+<span class="c"># 其余都在测「缝隙」：</span>
+时间戳能不能贴回 · 引文边界对不对 · 覆盖账本记不记
+缓存键换条件会不会失效 · 路径会不会穿越 · 并发会不会串账
+降级报告有没有交底 · 评测计算的分母对不对</pre>
+    </div>
+
+    <h3>第二道门：金标准回归</h3>
+    <p>19 条金标准 + 4 条视觉点，每次改动提示词、模型、分块策略后重跑。它回答「内容覆盖有没有退步」。但这道门有一个现实限制：样本太小（第 3 章），所以它只能设一个很粗的闸——比如「命中数不得低于 3/19」——不能设「必须达到 15/19」。设太细的门，只会让团队学会调参过拟合这 19 条。</p>
+    <p>更合理的用法是<strong>方向性回归</strong>：改动前后各跑 3 次，比较均值与区间；如果区间大幅重叠，就不宣称提升。这把「有没有变好」从「分数涨了没有」变成了「差异是否超过噪声」。</p>
+
+    <h3>第二点五道门：问答合同（40 个用例）</h3>
+    <p>摘要之外还有一条产品线：「问这个视频」。它的评测目标不是「答得像」，而是「引用得住」：每个回答必须带引用 ID，引用必须来自当轮注入的来源，回填的原话必须与索引原文逐字一致。40 个标注问题里 28 个有答案、12 个无答案（无答案必须拒答或标 insufficient），其中包含跨视频题与「答案只在长视频后半段」的题。</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>硬指标</th><th>结果</th><th>含义</th></tr></thead>
+        <tbody>
+          <tr><td>引用 ID 匹配</td><td class="num">100%</td><td>entry.citations ⊆ 当轮注入来源</td></tr>
+          <tr><td>回填原话逐字一致</td><td class="num">100%</td><td>quote == docs.raw</td></tr>
+          <tr><td>编造引用被丢弃</td><td class="num">2 / 2</td><td>不存在的 ID 全部被丢并记录</td></tr>
+          <tr><td>无答案拒答率</td><td class="num">100%</td><td>12 个无答案问题全部拒答/标不足</td></tr>
+          <tr><td>跨视频双来源</td><td class="num">10 / 10</td><td>两个视频各引一条</td></tr>
+          <tr><td>后半段引用</td><td class="num">5 / 5</td><td>3600s 视频的后半段没被截断</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>这组数字同样来自模拟模型，文件开头写着 <code>simulated-model（系统合同验证；真实模型的引用支持率/拒答率待 Gate 复测）</code>。它证明的是合同：引用解析、逐字回填、拒答路径、长视频后半段检索、历史持久化（40 轮重开可读）。它不证明真实模型会老实引用——那是下一层的事。</p>
+
+    <h3>第三道门：质量门（体检，不是裁判）</h3>
+    <p>报告级质量门输出诊断：要点与邻近字幕高度重复（<code>transcript_like</code>）、画面判断没有证据帧（<code>visual_without_evidence</code>）、要点集中在片头（<code>uncovered_tail</code>）、覆盖不完整（<code>coverage_incomplete</code>）、支持率偏低（<code>weak_source_support</code>）。状态只有 pass / review / fail；除结构性错误外，它从不删除内容。</p>
+    <p>它在门禁里的角色是<strong>黄灯</strong>，不是红灯：review 不阻止生成，但阻止「把这份报告当作已验证的样本发出去」。这也是它和测试的区别——测试回答「代码对不对」，质量门回答「这份产物像不像话」。</p>
+
+    <h3>第四道门：人工复核</h3>
+    <p>模型/渠道要升级到「金标准候选」，需要同时满足：T1 体检 <code>report_ok</code>（JSON 成功率 ≥2/3 且 tokens_in_60s ≥2500）、人工九项清单全部 passed、引用对齐率 ≥0.8。九项清单是固定的：工程机与温度、CPU 功耗口径、CPU 数字配对、CPU 等性能对照、GPU 峰值与等性能、GPU 低功耗条件、游戏与窗口、AI 名称与单位、量产待验证。</p>
+    <p>注意这套门禁的对象：它管的是「这个渠道/模型能不能被选为默认」，不是「这一篇报告能不能发」。两个决定的风险不同，门的严格程度也不同。把两者混在一起，会导致要么模型永远上不了线，要么报告未经复核就流出。</p>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>发布对象</th><th>必须过的门</th><th>典型判定</th></tr></thead>
+        <tbody>
+          <tr><td><b>代码改动</b></td><td>合同测试 + 关键路径回归</td><td>3587 全绿才允许合并</td></tr>
+          <tr><td><b>默认模型/渠道</b></td><td>T1 体检 + 九项人工 + 引用对齐</td><td>四者齐全才是 <code>gold_candidate</code></td></tr>
+          <tr><td><b>一份具体报告</b></td><td>质量门 + 抽检</td><td>review 状态可以发，但必须带「待核实」标记</td></tr>
+          <tr><td><b>评测结论</b></td><td>固定条件 + 多次运行 + 区间</td><td>单次、无区间、换过条件的，不进结论</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <figure class="fig">
+      <div class="frame"><img src="assets/art/gate.webp" alt="纸鹤站在昏暗大厅里，面前四道闸机分别亮着绿、绿、黄、红的指示灯，旁边一叠空白卡片" width="1280" height="768"/></div>
+      <figcaption><b>FIG. 04</b>四道门：任何一道单独亮绿灯，都不足以放行。</figcaption>
+    </figure>
+
+    <p>下面这枚小样把四道门做成开关。你会发现：合同测试全绿、金标准 15/19，只要人工复核没做，最终状态仍然不是「可发」；反过来，人工说好、质量门却是 fail，也不能发。门禁的意义就在于<strong>没有任何一道门可以单独放行</strong>。</p>
+  </div>
+
+  <div class="demo" id="demo-gate">
+    <div class="demo-head">
+      <span class="demo-tag">DEMO 04</span>
+      <span class="demo-title">发布门禁 <span class="hint">四道门，缺一不可</span></span>
+    </div>
+    <div class="demo-body">
+      <div class="gates" id="gates">
+        <div class="gate pass" data-g="contract"><span class="no">01</span><span class="lbl"><b>合同测试</b><small>3587 个用例 / 0 失败</small></span><span class="st">PASS</span></div>
+        <div class="gate pass" data-g="golden"><span class="no">02</span><span class="lbl"><b>金标准回归</b><small>19 条要点 + 4 条视觉点，3 次运行</small></span><span class="st">PASS</span></div>
+        <div class="gate pass" data-g="quality"><span class="no">03</span><span class="lbl"><b>质量门</b><small>0 error / 4 warning / review</small></span><span class="st">PASS</span></div>
+        <div class="gate fail" data-g="human"><span class="no">04</span><span class="lbl"><b>人工复核</b><small>九项清单 + 引用对齐率</small></span><span class="st">FAIL</span></div>
+      </div>
+      <div class="gate-verdict">
+        <span class="v block" id="gate-v">BLOCK</span>
+        <span class="why" id="gate-why">人工复核未完成：金标准与质量门通过，只能说明「机器没坏、产物像话」，不能替代人对内容的判断。</span>
+      </div>
+      <p class="hintline" style="margin-top:10px">点任意一门切换 PASS / FAIL，看最终 verdict 如何变化。规则：四门全 PASS 才 SHIP；任何一门 FAIL 即 BLOCK；质量门 review 视为 PASS-with-warning，不单独放行。</p>
+    </div>
+    <div class="demo-foot"><b>模型</b> 门禁规则取自 SeeFlow 的测试、评测与成绩单实现（<code>report_ok</code> / 九项清单 / 引用对齐 ≥0.8）；示意状态是四种典型组合，不是实时数据。</div>
+  </div>
+</section>
+
+<section class="chapter" id="ch7">
+  <div class="ch-head">
+    <div class="ch-num">SECTION<b>07</b></div>
+    <div class="ch-title">
+      <h2>人的位置</h2>
+      <p>当所有自动指标都能被优化，唯一还剩下的信号是：人改了多少次。</p>
+    </div>
+  </div>
+  <div class="ch-body">
+    <p class="lede">自动评测有一个天然的上限：任何被写进指标的信号，都会被优化。模型会在 <code>transcript_like</code> 上学会少复述，在 <code>bigram</code> 上学会多抄原词，在「视觉增益」上学会把所有视觉点都写成「我看到了」。指标越具体，过拟合越容易。所以评测体系最后一定要留一道人的门——不是不信任机器，是承认指标只是承诺的近似。</p>
+
+    <h3>一份全员通过的体检，没有区分度</h3>
+    <p>SeeFlow 的模型成绩单存在 <code>work/_scorecards/</code> 下。我数了一下：<strong>87 份成绩单，86 份是同一个渠道的同一款模型，指标完全一致</strong>——JSON 3/3、<code>tokens_in_60s = 12000</code>、<code>vision_ok = true</code>、档位 <code>report_ok</code>。剩下 1 份只有渠道名，没有 T1 数据。</p>
+    <p>不管这些卡片来自夹具、演示渠道还是真实端点，它们都暴露了同一个问题：<strong>一份所有人都能通过的体检，只能当冒烟测试，不能当质量排序。</strong> 当 86 个样本的指标一模一样时，这套体检的区分度是 0；它可以拦下「完全不能用」的端点，但无法告诉你 A 比 B 好。</p>
+    <p>代码里其实写得很诚实：档位阈值标着「占位，方案 C6：先采数据后定线」——<code>JSON ≥2/3</code>、<code>tokens_in_60s ≥800</code> 是骨架线，<code>≥2500</code> 是报告线。这些数字是结构先立住时的占位，不是从真实分布里标定出来的。<strong>阈值是占位，这件事本身就应该写在评测报告里</strong>，否则读者会以为 <code>report_ok</code> 是一个有含金量的认证。</p>
+
+    <h3>抽检：从「全量评」到「抽样评」</h3>
+    <p>19 条金标准只覆盖一条视频；真实产品每天产出几十份报告，不可能每份都人工读。可行的做法是分层抽检：</p>
+    <ul>
+      <li><strong>高风险优先</strong>：覆盖不完整（<code>coverage_incomplete</code>）、支持率低（<code>weak_source_support</code>）、视觉断言无证据的，先进人工队列；</li>
+      <li><strong>分层配额</strong>：按视频类型（教程/评测/访谈/Vlog）分配抽检名额，避免只看容易的一条；</li>
+      <li><strong>双人复核</strong>：抽中的样本由两个人独立判断，算一致性；不一致的条目进入标注规范讨论，而不是直接判模型错。</li>
+    </ul>
+    <p>SeeFlow 的九项清单就是为这类复核准备的：它不是打分表，是「哪些地方最容易错」的检查单。工程机与温度、CPU 功耗口径、数字配对、等性能对照……每一项都对应一类真实翻车。人工只需要勾 passed / failed，系统把它折算成 <code>review_status</code>；只有全 passed + 引用对齐 ≥0.8 + 基础档 <code>report_ok</code>，才会成为 <code>gold_candidate</code>。</p>
+
+    <h3>最诚实的指标：被纠正次数</h3>
+    <p>如果只能留一个长期指标，我会留「人改了多少次」，而不是「模型答对了多少条」。理由很实际：命中率可以被提示词和评测集共同过拟合，但<strong>用户每次打开报告后动手改的地方，是真实需求与模型输出之间的差</strong>。它不需要金标准，不需要判分器，也不会因为换了一个 benchmark 就失效。</p>
+    <p>具体可以记三个数：每条要点的编辑率（有多少条被人改过）、每份报告的编辑距离（改了多少字）、以及「改完之后是否还会回来再改」（返工率）。这三个数不需要模型配合，只需要产品把编辑行为记下来。它衡量的是「省了多少事」，而不是「答对了多少题」——对 Agent 产品来说，后者只是前者的一个代理。</p>
+    <div class="note"><b>注意：</b>「被纠正次数」也有偏差——用户可能懒得改、可能改错、可能只改自己关心的部分。它不能替代金标准，只能作为长期趋势信号。任何单一指标都会被游戏，包括这一个。</div>
+
+    <h3>评测集会腐烂</h3>
+    <p>最后一件必须提前说的事：金标准会腐烂。只要这 19 条被用来调提示词、选用例、做产品决策，它就不再是「测试集」，而是「训练信号」。团队会不自觉地针对它优化：把「最佳外观奖」的措辞调成金标准的样子，把时间窗往 15 秒对齐，把视觉点写成固定句式。半年后，分数很高，能力没变。</p>
+    <p>防腐烂的办法不复杂，但要自律：</p>
+    <ol>
+      <li><strong>留一份 holdout</strong>：至少 30% 的金标准从不参与日常迭代，只在版本发布前跑一次；</li>
+      <li><strong>定期换血</strong>：每季度加 5–10 条新视频，旧的降级为「回归集」，不再作为能力证明；</li>
+      <li><strong>记录用例版本</strong>：每次评测写入 case 版本号与标注日期，避免拿新旧两套金标准比较分数；</li>
+      <li><strong>公开失败样本</strong>：像 <code>missed_gold</code> 那样把漏掉的条目列出来，而不是只报总分。</li>
+    </ol>
+    <p>SeeFlow 目前只做到了第 3 条（评测结果带时间戳与工作目录），前三条还是待办。这不是漂亮话，是下一版评测设施要补的债。</p>
+  </div>
+</section>
+
+<section class="chapter" id="closing">
+  <div class="ch-head">
+    <div class="ch-num">END<b>00</b></div>
+    <div class="ch-title">
+      <h2>结语：允许分数不好看</h2>
+      <p>一个评测体系的成熟度，看它敢不敢报告自己的不确定性。</p>
+    </div>
+  </div>
+  <div class="epilogue">
+    <p class="lead">把这一篇收拢，评测其实只做三件事：<strong>定义承诺</strong>（什么叫「好」）、<strong>选择尺子</strong>（用什么判分）、<strong>报告不确定性</strong>（这个分数能信到什么程度）。三件事里，最难的是第三件——因为它要求你主动说「我这个数不太准」。</p>
+    <p>SeeFlow 的评测设施现在能说三句实话：3/19 的 95% 区间是 5.5%–37.6%；同一个 3/19 换个窗口能变成 26.3%；3587 个测试全绿也不代表内容正确。这三句实话比任何一次高分都更有价值——它们让下一次迭代知道该往哪里走，而不是在一个漂亮的数字上原地打转。</p>
+
+    <h3 style="font-size:22px;margin:32px 0 8px">三条可以搬走的做法</h3>
+    <div class="rules">
+      <div class="rule"><b>RULE 01 / 先写承诺，再选尺子</b><p>评测方式应该由产品承诺倒推：承诺「时间戳可跳转」，时间窗就必须紧；承诺「综合改写」，判分就必须容忍改写。先选一个好看的指标，再去找场景，是自欺的开始。</p></div>
+      <div class="rule"><b>RULE 02 / 报口径、报区间、报运行次数</b><p>任何百分比都要带分子分母；任何小样本都要带置信区间；任何对比都要说明跑了几次。缺一个，这个数字就不该进决策会。</p></div>
+      <div class="rule"><b>RULE 03 / 评测器自己也要被评测</b><p>判分器会有盲区，指标会被过拟合，金标准会腐烂。留一份 holdout、留一道人工门、留一条「这个数可能不准」的注脚——这是评测体系能活过两个版本的前提。</p></div>
+    </div>
+
+    <h3 style="font-size:22px;margin:32px 0 8px">这篇文没解决的问题</h3>
+    <div class="limits">
+      <p><b>金标准只有 19 条、一条视频、一个标注者。</b>没有标注者间一致性，没有教程/访谈/直播的独立用例，跨领域泛化完全没有证据。19 条只能区分「基本不会」和「基本都会」。</p>
+      <p><b>判分器共享同一个盲区。</b>校验层、评测层、幻觉率都用 bigram；同义改写和「用真实的词说错的话」都抓不住。异构判分器与人工校准集还没做。</p>
+      <p><b>真实模型的评测还没跑完。</b>夹具基线是模拟模型（92.42% 那组数字不代表模型质量）；受控重跑在 8 个请求时被 524 掐断。真实质量数字目前只有那条 18 分钟实跑的 3/19。</p>
+      <p><b>「被纠正次数」还只是提案。</b>产品里没有记录编辑行为，返工率、编辑距离都还没有数据。它可能是最诚实的指标，但现在只是一个方向。</p>
+      <p><b>评测集没有 holdout。</b>19 条金标准已经参与了多轮迭代，严格说它已经被污染；下一版必须切出 holdout 并补新用例，否则分数只会越来越好看。</p>
+    </div>
+
+    <h3 style="font-size:22px;margin:32px 0 8px">制作说明</h3>
+    <p style="font-size:13.5px;color:var(--muted)">本文是「造物手记」第六篇，素材来自 SeeFlow 仓库的真评测设施：<code>eval/run.py</code>、<code>quality_baseline.py</code>、<code>qa_check.py</code>、<code>controlled_retest.py</code>、<code>model_scorecard.py</code>，以及 <code>eval/results/</code> 与 <code>work/</code> 下的真实结果。文中 0/19、3/19、5/19、5.3%–26.3%、92.42%/85.74%/79.31%/91.09%、57.02%/89.61% 等数字都可由仓库数据复算。四枚小样为确定性模型：Wilson 区间、真实预测的金标准匹配、二项抽样、门禁规则，公式写在正文与脚注。插图五张由 GPT 系图像模型生成；字体为 LXGW 文楷子集；页面零构建、零依赖，单文件交付。</p>
+
+    <div class="links">
+      <a href="https://github.com/StarrySea1412/seeflow">SeeFlow 源码 →</a>
+      <a href="https://starrysea1412.github.io/seeflow-story/">上一篇：让 Agent 亲眼看一眼 →</a>
+      <a href="https://starrysea1412.github.io/agent-kernel/">Agent 内核 →</a>
+      <a href="https://starrysea1412.github.io/agent-memory/">Agent 记忆 →</a>
+    </div>
+  </div>
+</section>
+
+</main>
+<footer class="wrap site-foot">
+  <div>
+    <div>造物手记 VOL.06 · 给 Agent 打分</div>
+    <div style="margin-top:5px">EVAL / 2026.10 / 单文件 · 零依赖</div>
+  </div>
+  <div class="foot-note">文中数字来自 SeeFlow 仓库的真实评测设施与结果：eval/cases/yingshi-2025-awards、eval/results/quality-baseline-20260930-201221.json、eval/results/qa-check-20260922-071356.json、eval/results/xiaobai-…/requests.json、work/_scorecards/。代码摘录为讲解节选，完整实现以仓库为准。插图由 GPT 系图像模型生成，字体为 LXGW 文楷（OFL）。</div>
+</footer>
+
+<script>
+const EVAL_DATA = {
+ "gold": [
+  {
+   "t": 20,
+   "text": "评选是主观评价，重点放在相机视频功能，只提及少量拍照"
+  },
+  {
+   "t": 101,
+   "text": "最佳vlog相机：佳能 PowerShot V1，弥补 Pocket 3 痛点（更多焦段、更好画质、C-Log 3、内置麦克风好、可外接无线麦）"
+  },
+  {
+   "t": 129,
+   "text": "能打败 PowerShot V1 的对手可能只有尚未发布的 Pocket 4"
+  },
+  {
+   "t": 139,
+   "text": "最佳外观奖：SIGMA BF，众多相机里最亮眼的存在"
+  },
+  {
+   "t": 241,
+   "text": "最佳创新奖：英零 A1 全景无人机，核心是解耦——没有云台限制头部转向，构图与飞行逻辑都变了"
+  },
+  {
+   "t": 255,
+   "text": "创新奖曾纠结 Flip，但它仍是传统相机结构所以放弃"
+  },
+  {
+   "t": 373,
+   "text": "最佳手机视频奖：iPhone 17 Pro"
+  },
+  {
+   "t": 396,
+   "text": "最佳无人机奖：大疆 Mavic 4 Pro"
+  },
+  {
+   "t": 483,
+   "text": "最佳 APS-C：佳能 R50V 加 RF14-30 镜头约为一半价格，2400万像素无机身防抖，6K超采4K30、裁切4K60、C-Log 3、翻转屏"
+  },
+  {
+   "t": 515,
+   "text": "富士 X-M3 落选关键：麦克风接口是 2.5mm 而非 3.5mm"
+  },
+  {
+   "t": 602,
+   "text": "最佳全画幅：佳能 R6 III，7K 30 RAW Open Gate、7K 60 RAW 16:9、7K超采4K30、无裁切4K120，同价位规格上限最高"
+  },
+  {
+   "t": 637,
+   "text": "R6 III 缺点：60帧下约30分钟过热关机，其他格式可长时间录制"
+  },
+  {
+   "t": 721,
+   "text": "最佳性价比：尼康 ZR，唯一缺陷是 RAW 数据量大、存储卡成本高，期待固件更新"
+  },
+  {
+   "t": 753,
+   "text": "挤牙膏奖：索尼 FX2，本质是换壳 A7M4/A7C2"
+  },
+  {
+   "t": 847,
+   "text": "富士 GFX100RF 中画幅，售价比哈苏低不少，是今年较特殊的选择"
+  },
+  {
+   "t": 869,
+   "text": "遗憾奖：索尼 A7M5——遗憾不代表不好，3300万像素、7K超采4K60、4K120，但录制规格没有更多突破"
+  },
+  {
+   "t": 961,
+   "text": "最佳镜头：索尼 50-150 F2.0，光圈比 2.8 亮，体验极佳且比想象中轻"
+  },
+  {
+   "t": 975,
+   "text": "最佳电影机：Alexa 35 Extreme；入围含佳能 C50、BMPCC 17K、Pyxis 12K、Red 新机"
+  },
+  {
+   "t": 984,
+   "text": "BMPCC 17K Cinema 6 是目前世界上分辨率最高的摄影机"
+  }
+ ],
+ "visual": [
+  {
+   "t": 158,
+   "text": "SIGMA BF 的实机外观在众多黑色相机中最亮眼（外观判断依赖画面）"
+  },
+  {
+   "t": 274,
+   "text": "全景无人机解耦演示：画面中云台不再限制头部转向，可以随便看"
+  },
+  {
+   "t": 841,
+   "text": "GFX100RF 屏幕上显示首发价格，目前市售价更低"
+  },
+  {
+   "t": 640,
+   "text": "R6 III 过热测试画面：60帧录制下机身过热提示"
+  }
+ ],
+ "pred": [
+  {
+   "t": 19,
+   "text": "声明评选完全主观，且重点放在相机的视频功能上"
+  },
+  {
+   "t": 42,
+   "text": "强调没有任何厂商赞助或干扰评选结果"
+  },
+  {
+   "t": 88,
+   "text": "2025年最佳vlog相机颁给佳能PowerShot V1"
+  },
+  {
+   "t": 167,
+   "text": "最佳外观奖得主是适马BF，精致铝合金机身"
+  },
+  {
+   "t": 236,
+   "text": "带可变光圈的大疆Action 6获得最佳运动相机奖"
+  },
+  {
+   "t": 254,
+   "text": "最佳创新奖颁给英零A1全景无人机"
+  },
+  {
+   "t": 464,
+   "text": "最佳APS-C相机奖颁给佳能R50V，性价比突出"
+  },
+  {
+   "t": 554,
+   "text": "理光GR4只能拍1080P视频，获'最偏科相机'奖"
+  },
+  {
+   "t": 590,
+   "text": "最佳全画幅相机奖颁给佳能R63，规格同价位最高"
+  },
+  {
+   "t": 681,
+   "text": "最佳性价比相机授予尼康ZR，首发价13999元"
+  },
+  {
+   "t": 904,
+   "text": "年度'挤牙膏'相机：索尼FX2，本质是换壳A7M4，录制规格原地踏步；另A7M5因四年没有更多录制规格获'遗憾奖'"
+  },
+  {
+   "t": 945,
+   "text": "最佳镜头奖颁给索尼50-150 f2.0"
+  },
+  {
+   "t": 1011,
+   "text": "最佳电影机颁给Alexa 35 Extreme，2K可达660帧"
+  },
+  {
+   "t": 1071,
+   "text": "坦言今年很难选，因为各品类竞争都非常激烈"
+  }
+ ]
+};
+/* 四枚确定性小样 + 阅读进度条（零依赖，全部原生 DOM）。 */
+(() => {
+  "use strict";
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const pct = (v, d = 1) => (v * 100).toFixed(d) + "%";
+
+  const prog = $("#progress");
+  if (prog) {
+    const paint = () => {
+      const h = document.documentElement;
+      const max = h.scrollHeight - h.clientHeight;
+      prog.style.transform = "scaleX(" + (max > 0 ? h.scrollTop / max : 0) + ")";
+    };
+    addEventListener("scroll", paint, { passive: true });
+    addEventListener("resize", paint, { passive: true });
+    paint();
+  }
+
+  /* ── 公共：bigram（与 eval/run.py 同构） ── */
+  const norm = (text) => String(text).toLowerCase().match(/[\u4e00-\u9fff a-z0-9]+/g)?.join("") || "";
+  const grams = (text) => {
+    const s = norm(text);
+    const out = [];
+    for (let i = 0; i < s.length - 1; i++) out.push(s.slice(i, i + 2));
+    return out;
+  };
+  const bigram = (a, b) => {
+    const ga = grams(a);
+    if (!ga.length) return 0;
+    const gb = new Set(grams(b));
+    let hit = 0;
+    for (const g of ga) if (gb.has(g)) hit++;
+    return hit / ga.length;
+  };
+  const tokens = (text) => new Set((String(text).toLowerCase().match(/[a-z0-9]+|[\u4e00-\u9fff]/g) || []));
+  const jaccard = (a, b) => {
+    const A = tokens(a), B = tokens(b);
+    if (!A.size || !B.size) return 0;
+    let inter = 0;
+    for (const x of A) if (B.has(x)) inter++;
+    return inter / (A.size + B.size - inter);
+  };
+  const fmtT = (t) => String(Math.floor(t / 60)).padStart(2, "0") + ":" + String(Math.round(t % 60)).padStart(2, "0");
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  /* ══════ DEMO 01 · 置信区间尺 ══════ */
+  (() => {
+    const root = $("#demo-ci"); if (!root) return;
+    const elN = $("#ci-n"), elK = $("#ci-k"), elK2 = $("#ci-k2");
+    const outRows = $("#ci-rows"), outGrid = $("#ci-grid"), outTicks = $("#ci-ticks");
+    const outPa = $("#ci-pa"), outPb = $("#ci-pb"), outIa = $("#ci-ia"), outIb = $("#ci-ib");
+    const outOverlap = $("#ci-overlap"), outConclusion = $("#ci-conclusion"), outVerdict = $("#ci-verdict"), outNeed = $("#ci-need");
+
+    function wilson(k, n, z = 1.96) {
+      if (!n) return [0, 1];
+      const p = k / n, d = 1 + z * z / n;
+      const c = (p + z * z / (2 * n)) / d;
+      const h = z * Math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / d;
+      return [Math.max(0, c - h), Math.min(1, c + h)];
+    }
+
+    function render() {
+      const n = +elN.value;
+      elK.max = String(n); elK2.max = String(n);
+      if (+elK.value > n) elK.value = String(n);
+      if (+elK2.value > n) elK2.value = String(n);
+      const ka = +elK.value, kb = +elK2.value;
+      $("#ci-n-v").textContent = n;
+      $("#ci-k-v").textContent = ka;
+      $("#ci-k2-v").textContent = kb;
+      const A = wilson(ka, n), B = wilson(kb, n);
+      outPa.textContent = pct(ka / n); outPb.textContent = pct(kb / n);
+      outIa.textContent = pct(A[0]) + "–" + pct(A[1]);
+      outIb.textContent = pct(B[0]) + "–" + pct(B[1]);
+      const overlap = A[0] <= B[1] && B[0] <= A[1];
+      outOverlap.textContent = overlap ? "是" : "否";
+      outConclusion.textContent = overlap ? "不成立" : "可区分（保守）";
+      const need = Math.ceil(1.96 * 1.96 * 0.8 * 0.2 / (0.1 * 0.1));
+      outNeed.textContent = need + " 条";
+      outVerdict.textContent = overlap
+        ? "两个区间重叠：这点差异完全可能是抽样噪声，不能宣称 B 更好。"
+        : "两个 95% 区间不重叠：差异不太可能纯由抽样造成（保守近似，不是正式检验）。";
+
+      outRows.innerHTML = "";
+      const rows = [["A", A, ka / n, "a"], ["B", B, kb / n, "b"]];
+      rows.forEach(([lbl, ci, p, cls], i) => {
+        const row = document.createElement("div");
+        row.className = "ci-row";
+        row.style.top = (18 + i * 62) + "px";
+        row.innerHTML = `<span class="lbl">${lbl}</span>
+          <span class="ci-bar ${cls}" style="left:${ci[0] * 100}%;width:${Math.max(0.4, (ci[1] - ci[0]) * 100)}%"></span>
+          <span class="ci-dot" style="left:${p * 100}%"></span>`;
+        outRows.appendChild(row);
+      });
+      outGrid.innerHTML = [10, 20, 30, 40, 50, 60, 70, 80, 90].map((v) =>
+        `<i style="left:${v}%"></i>`).join("");
+      outTicks.innerHTML = [0, 20, 40, 60, 80, 100].map((v) =>
+        `<span class="ci-tick" style="left:calc(36px + (100% - 50px) * ${v / 100})">${v}%</span>`).join("");
+    }
+
+    $("#ci-presets").addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-p]"); if (!b) return;
+      $$("#ci-presets button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+      const [a, c, n] = b.dataset.p.split(",").map(Number);
+      elN.value = String(n); elK.value = String(a); elK2.value = String(c);
+      render();
+    });
+    [elN, elK, elK2].forEach((el) => el.addEventListener("input", () => {
+      $$("#ci-presets button").forEach((x) => x.setAttribute("aria-pressed", "false"));
+      render();
+    }));
+    render();
+  })();
+
+  /* ══════ DEMO 02 · 判分器对照台 ══════ */
+  (() => {
+    const root = $("#demo-judge"); if (!root) return;
+    const GOLD = EVAL_DATA.gold, PRED = EVAL_DATA.pred;
+    const state = { mode: "bigram", window: 15, th: 0.25 };
+    const outList = $("#judge-list"), outScore = $("#judge-score"), outRate = $("#judge-rate");
+    const outDef = $("#judge-def"), outFp = $("#judge-fp");
+
+    const DEFS = {
+      exact: "预测文本与金标准逐字相同（忽略空白）；不设时间窗",
+      time: "±窗口内有任意一条预测即命中；完全不看内容",
+      bigram: "bigram ≥ 阈值，且 |Δt| ≤ 窗口；每条金标准只能被一条预测认领",
+      jaccard: "词元集合 Jaccard ≥ 阈值，且 |Δt| ≤ 窗口"
+    };
+
+    function scoreOne(g, p) {
+      const dt = Math.abs(p.t - g.t);
+      if (state.mode === "exact") return { hit: norm(g.text) === norm(p.text), s: norm(g.text) === norm(p.text) ? 1 : 0, dt };
+      if (dt > state.window) return { hit: false, s: 0, dt };
+      if (state.mode === "time") return { hit: true, s: 1, dt };
+      const s = state.mode === "jaccard" ? jaccard(g.text, p.text) : bigram(g.text, p.text);
+      return { hit: s >= state.th, s, dt };
+    }
+
+    function render() {
+      const used = new Set();
+      const rows = [];
+      let hits = 0, fp = 0;
+      GOLD.forEach((g) => {
+        let best = null;
+        PRED.forEach((p, i) => {
+          if (used.has(i)) return;
+          if (state.mode !== "exact" && Math.abs(p.t - g.t) > state.window) return;
+          const r = scoreOne(g, p);
+          if (!best || r.s > best.s || (r.s === best.s && r.dt < best.dt)) best = { p, i, ...r };
+        });
+        if (best && best.hit) {
+          used.add(best.i); hits++;
+          if (state.mode === "time") {
+            const near = PRED.filter((q) => Math.abs(q.t - g.t) <= state.window);
+            const bestContent = near.length ? Math.max(...near.map((q) => bigram(g.text, q.text))) : 0;
+            if (bestContent < 0.25) fp++;
+          }
+          rows.push({ g, p: best.p, s: best.s, dt: best.dt, hit: true });
+        } else {
+          rows.push({ g, p: null, hit: false });
+        }
+      });
+      outList.innerHTML = rows.map((r) => `
+        <div class="jrow ${r.hit ? "hit" : "miss"}">
+          <span class="t">${fmtT(r.g.t)}</span>
+          <span><span class="g">${r.g.text}</span>
+            ${r.p ? `<span class="p">↳ ${r.p.text}${r.hit && state.mode !== "exact" && state.mode !== "time" ? ` · 相似 ${r.s.toFixed(3)} · Δt ${r.dt.toFixed(0)}s` : ""}</span>` : ""}
+          </span>
+          <span class="mark">${r.hit ? "HIT" : "MISS"}</span>
+        </div>`).join("");
+      outScore.innerHTML = hits + " <small>/ " + GOLD.length + "</small>";
+      outRate.textContent = pct(hits / GOLD.length);
+      outDef.textContent = DEFS[state.mode];
+      outFp.textContent = String(fp);
+      $("#judge-window-v").textContent = "±" + state.window + "s";
+      $("#judge-th-v").textContent = state.th.toFixed(2);
+    }
+
+    $("#judge-modes").addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-j]"); if (!b) return;
+      state.mode = b.dataset.j;
+      $$("#judge-modes button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+      render();
+    });
+    $("#judge-window").addEventListener("input", (e) => { state.window = +e.target.value; render(); });
+    $("#judge-th").addEventListener("input", (e) => { state.th = +e.target.value; render(); });
+    render();
+  })();
+
+  /* ══════ DEMO 03 · 重复运行 ══════ */
+  (() => {
+    const root = $("#demo-runs"); if (!root) return;
+    const elP = $("#runs-p"), elN = $("#runs-n"), elTotal = $("#runs-total");
+    const outPlot = $("#runs-plot"), outNote = $("#runs-note");
+    let seed = 2026;
+
+    function sampleBinomial(n, p, rnd) {
+      let k = 0;
+      for (let i = 0; i < n; i++) if (rnd() < p) k++;
+      return k;
+    }
+
+    function render() {
+      const p = +elP.value, runs = +elN.value, total = +elTotal.value;
+      $("#runs-p-v").textContent = p.toFixed(2);
+      $("#runs-n-v").textContent = runs;
+      $("#runs-total-v").textContent = total;
+      const rnd = mulberry32(seed);
+      const vals = Array.from({ length: runs }, () => sampleBinomial(total, p, rnd) / total);
+      const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+      const sd = vals.length > 1 ? Math.sqrt(vals.reduce((a, b) => a + (b - mean) ** 2, 0) / (vals.length - 1)) : null;
+      const se = sd === null ? null : sd / Math.sqrt(vals.length);
+      const lo = se === null ? mean : Math.max(0, mean - 1.96 * se);
+      const hi = se === null ? mean : Math.min(1, mean + 1.96 * se);
+      const min = Math.min(...vals), max = Math.max(...vals);
+
+      outPlot.innerHTML = "";
+      const band = document.createElement("div");
+      band.className = "runs-band";
+      band.style.bottom = (26 + lo * 130) + "px";
+      band.style.height = ((hi - lo) * 130) + "px";
+      outPlot.appendChild(band);
+      const meanLine = document.createElement("div");
+      meanLine.className = "runs-mean";
+      meanLine.style.bottom = (26 + mean * 130) + "px";
+      outPlot.appendChild(meanLine);
+      vals.forEach((v, i) => {
+        const dot = document.createElement("div");
+        dot.className = "runs-dot";
+        dot.style.left = (8 + (i / Math.max(1, vals.length - 1)) * 84) + "%";
+        dot.style.bottom = (26 + v * 130) + "px";
+        dot.title = "第 " + (i + 1) + " 次：" + pct(v);
+        outPlot.appendChild(dot);
+      });
+      [0, 0.25, 0.5, 0.75, 1].forEach((v) => {
+        const lab = document.createElement("span");
+        lab.className = "runs-label";
+        lab.style.left = "6px";
+        lab.style.bottom = (20 + v * 130) + "px";
+        lab.textContent = Math.round(v * 100) + "%";
+        outPlot.appendChild(lab);
+      });
+
+      $("#runs-mean").textContent = pct(mean);
+      $("#runs-sd").textContent = sd === null ? "—" : pct(sd);
+      $("#runs-min").textContent = pct(min);
+      $("#runs-max").textContent = pct(max);
+      outNote.textContent = sd === null
+        ? "只跑了一次：这是「一个样本」，不是「这个系统的水平」。"
+        : `单次范围 ${pct(min)}–${pct(max)}；${runs} 次均值 ${pct(mean)}，95% 区间 ${pct(lo)}–${pct(hi)}。` +
+          (runs < 8 ? " 次数太少，均值本身仍然很飘。" : " 均值开始稳定，但仍不等于「真实能力」——系统性偏差还在。");
+    }
+
+    $("#runs-seed").addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-s]"); if (!b) return;
+      seed = b.dataset.s === "2" ? 7 : 2026;
+      $$("#runs-seed button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+      render();
+    });
+    [elP, elN, elTotal].forEach((el) => el.addEventListener("input", render));
+    render();
+  })();
+
+  /* ══════ DEMO 04 · 发布门禁 ══════ */
+  (() => {
+    const root = $("#demo-gate"); if (!root) return;
+    const gates = $$("#gates .gate");
+    const outV = $("#gate-v"), outWhy = $("#gate-why");
+    const state = { contract: true, golden: true, quality: true, human: false };
+    const WHY = {
+      contract: "合同测试失败：代码不允许合并，谈质量没有意义。",
+      golden: "金标准回归未达标：内容覆盖退步，先修管线再谈发布。",
+      quality: "质量门 fail：报告存在结构性错误（缺时间戳或时间戳越界），必须修复。",
+      human: "人工复核未完成：金标准与质量门通过，只能说明「机器没坏、产物像话」，不能替代人对内容的判断。"
+    };
+    function render() {
+      gates.forEach((g) => {
+        const key = g.dataset.g;
+        g.classList.toggle("pass", state[key]);
+        g.classList.toggle("fail", !state[key]);
+        g.querySelector(".st").textContent = state[key] ? "PASS" : "FAIL";
+      });
+      const all = Object.values(state).every(Boolean);
+      outV.textContent = all ? "SHIP" : "BLOCK";
+      outV.className = "v " + (all ? "ship" : "block");
+      outWhy.textContent = all
+        ? "四道门全过：合同测试、金标准回归、质量门、人工复核均通过，允许发布。"
+        : WHY[Object.keys(state).find((k) => !state[k])];
+    }
+    gates.forEach((g) => g.addEventListener("click", () => {
+      state[g.dataset.g] = !state[g.dataset.g];
+      render();
+    }));
+    render();
+  })();
+})();
+
+</script>
+</body>
+</html>

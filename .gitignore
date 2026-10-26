@@ -1,0 +1,4 @@
+node_modules/
+*.log
+shots/
+build/chars.txt

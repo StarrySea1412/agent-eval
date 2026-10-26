@@ -1,0 +1,106 @@
+<section class="chapter" id="ch4">
+  <div class="ch-head">
+    <div class="ch-num">SECTION<b>04</b></div>
+    <div class="ch-title">
+      <h2>判分器也要被评测</h2>
+      <p>同一份输出，逐字判 0 分，时间窗判 5 分，bigram 判 3 分。尺子本身也是被测对象。</p>
+    </div>
+  </div>
+  <div class="ch-body">
+    <p class="lede">评测最容易被忽略的一层，是「判分」本身。大家都盯着被测系统，却默认尺子是准的。可尺子有三个可调参数：<strong>匹配方式、时间窗、相似阈值</strong>。任何一个动了，分数都会动——而且动得比模型升级还大。</p>
+    <p>还是那份 18 分钟实跑的 14 条要点。四种判分器，四种结果：</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>判分器</th><th>规则</th><th>命中</th><th>它相信什么</th></tr></thead>
+        <tbody>
+          <tr><td><b>逐字匹配</b></td><td>预测文本与金标准完全相同（或仅空白差异）</td><td class="num">0 / 19</td><td>只有原话才算对——但摘要的天职就是改写，所以它必然接近 0</td></tr>
+          <tr><td><b>只看时间窗</b></td><td>±15s 内有任意一条预测就算命中</td><td class="num">5 / 19</td><td>同一时刻的预测必然相关——但同一时刻可能聊三件事</td></tr>
+          <tr><td><b>bigram + 时间窗</b></td><td>±15s 且二字组命中率 ≥0.25</td><td class="num">3 / 19</td><td>改写的字面重叠仍然可测——但同义改写会漏</td></tr>
+          <tr><td><b>词元 Jaccard</b></td><td>±15s 且词元集合 Jaccard ≥0.3</td><td class="num">3 / 19</td><td>按词而不是按字重叠——对中文分词质量敏感</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>逐字匹配的 0 分不是「系统全错」，是「判分器选错了任务」。时间窗的 5 分里有 2 条是假阳性：预测确实在正确时刻附近，但说的是另一件事。bigram 和 Jaccard 都判 3 条，说明这 3 条是「字面也像、词也像」的硬命中；剩下的真要点大多是改写，字面判分器天然抓不到。</p>
+
+    <figure class="fig">
+      <div class="frame"><img src="assets/art/judge.webp" alt="纸鹤扮成法官，举着镜头形状的法槌，站在两架明显失衡的天平之间" width="1280" height="768"/></div>
+      <figcaption><b>FIG. 03</b>判分器不是天平，是另一件被测的仪器：它自己也会偏。</figcaption>
+    </figure>
+
+    <h3>时间窗挪 25 秒，分数翻五倍</h3>
+    <p>固定判分方式为 bigram、阈值 0.15，只改时间窗：</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>时间窗</th><th>命中</th><th>命中率</th><th>多出来的是什么</th></tr></thead>
+        <tbody>
+          <tr><td class="num">±5s</td><td>1 / 19</td><td>5.3%</td><td>只有时间戳几乎完全对齐的</td></tr>
+          <tr><td class="num">±15s</td><td>3 / 19</td><td>15.8%</td><td>章节级归并带来的十几秒偏移</td></tr>
+          <tr><td class="num">±30s</td><td>5 / 19</td><td>26.3%</td><td>邻近话题被「捞」进来，真假混杂</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>同一份输出，5.3% 到 26.3%，五倍。如果你只看到「26.3%」，会以为系统还不错；只看到「5.3%」，会以为它废了。两个数字都是真的，差别只在允许多大的时间误差。<strong>而时间窗不是随便定的：它应该匹配产品的实际体验。</strong> SeeFlow 的跳转体验要求 ±1–2 秒，但章节级摘要允许十几秒的归并误差——所以评测用 ±15s，并在报告里写清楚。</p>
+    <p>阈值同理。在 ±30s 窗口下：阈值 0.15 命中 5 条，0.22 命中 4 条，0.25 命中 4 条，0.30 命中 3 条，0.35 命中 3 条。从 0.15 到 0.35，只掉了 2 条，但这两条恰好是「内容相关、措辞较远」的真要点。<strong>判分器越严，它测得越像「复制能力」，越不像「理解能力」。</strong></p>
+
+    <h3>循环论证：裁判和选手共用一把尺</h3>
+    <p>这里有一个必须承认的设计缺陷：SeeFlow 的校验层用 bigram 判断「断言有没有依据」，评测层又用同一个 <code>_hit_ratio</code> 判断「预测有没有命中金标准」，连幻觉率也是同一个函数。这意味着：</p>
+    <ul>
+      <li>一个擅长复述原话的系统，会在校验层通过、在评测层得分高——但它可能并不理解；</li>
+      <li>一个擅长同义改写的系统，会在校验层被判低支持率、在评测层被判漏命中——但它可能是更好的摘要；</li>
+      <li>「幻觉率低」可能只是「它说的话都能在字幕里找到原词」，不等于「它说的是对的」。</li>
+    </ul>
+    <p>这是自指评测的经典问题：裁判用和选手一样的尺子，量出来的只是「像不像选手」。缓解办法有三条，SeeFlow 只做到了第一条：</p>
+    <ol>
+      <li><strong>金标准完全独立于被测系统</strong>（做到了：人工通读原始字幕）；</li>
+      <li><strong>至少再有一个异构判分器</strong>（没做：目前只有 bigram / Jaccard 两种字面判分，共享同一个盲区）；</li>
+      <li><strong>人工抽检作为最终裁决</strong>（有流程，但没有系统化抽样，见第 7 章）。</li>
+    </ol>
+
+    <h3>为什么暂时不用 LLM 当裁判</h3>
+    <p>一个自然的想法是：让另一个模型来判分，不就不循环了吗？不一定。LLM 裁判有它自己的偏差：偏好更长的答案、偏好和自己风格相近的措辞、对数字和单位的核对不如代码可靠、而且同一提示词两次判分也可能不一致。更麻烦的是，裁判模型往往和被评测模型来自同一批渠道——它们共享训练数据里的偏好。</p>
+    <p>SeeFlow 在生产里确实有一次 LLM 审核（<code>reviewer.py</code>），但它被限制得很窄：只杀「与记录直接矛盾」和「编造实体」两类错，材料不足只能标 <code>insufficient</code>，不能删。它不参与评测打分。<strong>把 LLM 裁判放进评测主指标之前，必须先有一份人工校准集，证明它的判断和人类一致</strong>——这份校准集目前还没有。</p>
+    <div class="note"><b>一个反直觉的结论：</b>判分器的选择应该由「产品承诺」决定，而不是由「哪个分数好看」决定。SeeFlow 承诺的是「可点击跳转的时间戳」，所以时间窗要紧（±15s）；承诺的是「综合改写」，所以判分必须容忍改写（bigram 而不是逐字）。先写承诺，再选尺子。</div>
+
+    <p>下面这枚小样用真实的 19 条金标准和那次实跑的 14 条预测，把四种判分器并排放。切换判分器，看哪些条目从「漏」变成「中」、哪些始终不变——那些始终不变的，才是真正被系统抓住的内容。</p>
+  </div>
+
+  <div class="demo" id="demo-judge">
+    <div class="demo-head">
+      <span class="demo-tag">DEMO 02</span>
+      <span class="demo-title">判分器对照台 <span class="hint">同一份预测，四种尺子，四个分数</span></span>
+    </div>
+    <div class="demo-body">
+      <div class="controls">
+        <div class="ctl" style="flex:0 0 auto">
+          <label>判分器</label>
+          <div class="seg" id="judge-modes">
+            <button data-j="exact" aria-pressed="false">逐字</button>
+            <button data-j="time" aria-pressed="false">只看时间</button>
+            <button data-j="bigram" aria-pressed="true">bigram</button>
+            <button data-j="jaccard" aria-pressed="false">Jaccard</button>
+          </div>
+        </div>
+        <div class="ctl">
+          <label for="judge-window">时间窗 <b id="judge-window-v">±15s</b></label>
+          <input id="judge-window" type="range" min="5" max="60" step="5" value="15"/>
+        </div>
+        <div class="ctl">
+          <label for="judge-th">相似阈值 <b id="judge-th-v">0.25</b></label>
+          <input id="judge-th" type="range" min="0.10" max="0.60" step="0.05" value="0.25"/>
+        </div>
+      </div>
+      <div class="judge-grid">
+        <div class="judge-list" id="judge-list"></div>
+        <div class="judge-side">
+          <div class="score" id="judge-score">3 <small>/ 19</small></div>
+          <div class="def" id="judge-def">bigram ≥ 0.25，且 |Δt| ≤ 15s；每条金标准只能被一条预测认领</div>
+          <div class="subrow"><span>命中率</span><b id="judge-rate">15.8%</b></div>
+          <div class="subrow"><span>假阳性（时间对内容错）</span><b id="judge-fp">2</b></div>
+          <div class="subrow"><span>真实预测条数</span><b>14</b></div>
+          <div class="subrow"><span>金标准条数</span><b>19</b></div>
+        </div>
+      </div>
+    </div>
+    <div class="demo-foot"><b>数据</b> 金标准来自 eval/cases/yingshi-2025-awards/gold.json（人工独立标注 19 条）；预测来自 work/f1b818c4/省流.md 的 14 条真实要点。判分逻辑与 eval/run.py 同构；逐字与只看时间是本演示的对照尺，不是正式评测口径。</div>
+  </div>
+</section>
